@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plánovač směn – MadMan Server</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a1a2e;min-height:100vh}
+.top{background:linear-gradient(135deg,#1F4E79,#2E75B6);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.top h1{font-size:20px;font-weight:600;letter-spacing:.5px}
+.top .sub{font-size:12px;opacity:.75;margin-top:2px}
+.controls{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.controls select,.controls button{font-size:13px;padding:6px 12px;border-radius:6px;border:none;cursor:pointer}
+.controls select{background:rgba(255,255,255,.15);color:#fff}
+.controls select option{color:#000}
+.btn-primary{background:#fff;color:#1F4E79;font-weight:600}
+.btn-primary:hover{background:#e8f0fe}
+.btn-secondary{background:rgba(255,255,255,.15);color:#fff}
+.btn-secondary:hover{background:rgba(255,255,255,.25)}
+.main{max-width:1400px;margin:0 auto;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+.stat-val{font-size:22px;font-weight:700;color:#1F4E79}
+.stat-lbl{font-size:11px;color:#888;margin-top:3px}
+.tbl-card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:hidden}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#1F4E79;color:#fff;font-weight:600;font-size:11px;padding:8px 4px;text-align:center;white-space:nowrap;position:sticky;top:0;z-index:2}
+thead th.col-name{text-align:left;padding-left:10px;min-width:100px;width:100px;position:sticky;left:0;z-index:3;background:#1F4E79}
+tbody tr:nth-child(even) td{background:#f7faff}
+tbody tr:hover td{background:#e8f4ff!important}
+tbody tr:hover td.col-name{background:#e8f4ff!important}
+td{padding:4px 2px;text-align:center;border-bottom:1px solid #f0f0f0;border-right:1px solid #f0f0f0}
+td.col-name{text-align:left;padding-left:10px;font-weight:600;font-size:12px;color:#1a1a2e;position:sticky;left:0;background:#fff;z-index:1;min-width:100px;width:100px;border-right:2px solid #dde}
+td.col-sum{font-weight:700;font-size:12px;background:#EBF3FB!important;color:#1F4E79;border-left:2px solid #dde}
+td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#375623;border-left:1px solid #dde}
+.smena-cell{cursor:pointer;border-radius:4px;font-size:11px;font-weight:700;user-select:none;transition:transform .08s,opacity .1s;min-width:28px;width:28px;padding:5px 2px}
+.smena-cell:hover{transform:scale(1.15);opacity:.85;z-index:10;position:relative}
+.smena-cell:active{transform:scale(.95)}
+.weekend{background:#f0ede8!important}
+.weekend .smena-cell{background:#ebe8e2!important}
+.svatek-col{background:#fff8e6!important}
+.total-row td{background:#1F4E79!important;color:#fff!important;font-weight:600;font-size:11px}
+.total-row td.col-name{background:#1F4E79!important;color:#fff!important}
+.legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding:14px 16px;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
+.leg-dot{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0}
+.leg-hint{margin-left:auto;font-size:10px;color:#aaa;font-style:italic}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:20px;min-width:280px;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:14px;color:#1F4E79}
+.modal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px}
+.modal-btn{padding:10px 4px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:transform .1s}
+.modal-btn:hover{transform:scale(1.06)}
+.modal-btn.clear{background:#f0f0f0;color:#888}
+.modal-close{width:100%;padding:8px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#555}
+.modal-close:hover{background:#e0e0e0}
+@media print{
+  body{background:#fff}
+  .top .controls,.legenda .leg-hint,.modal-bg{display:none!important}
+  .tbl-card,.stat{box-shadow:none;border:1px solid #ddd}
+  .smena-cell{cursor:default}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <h1>📅 Plánovač směn</h1>
+    <div class="sub">3-směnný provoz · klikni na buňku pro změnu směny</div>
+  </div>
+  <div class="controls">
+    <select id="sel-rok"><option>2025</option><option>2026</option><option selected>2027</option><option>2028</option></select>
+    <select id="sel-mes"></select>
+    <button class="btn-secondary" onclick="exportCSV()">⬇ CSV</button>
+    <button class="btn-primary" onclick="window.print()">🖨 Tisk</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="stats" id="stats"></div>
+  <div class="tbl-card">
+    <div class="tbl-wrap"><table id="tbl"></table></div>
+  </div>
+  <div class="legenda" id="leg"></div>
+</div>
+
+<div class="modal-bg" id="modal" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modal-title">Vyber směnu</h3>
+    <div class="modal-grid" id="modal-grid"></div>
+    <button class="modal-close" onclick="closeModal()">Zavřít</button>
+  </div>
+</div>
+
+<script>
+const ZAM = ["Sosnar","Záměčník","Cenek","Komosný","Kusák","Máj","Levák","Buchta"];
+const SMENY = ["D","N","R","DD","F8","FH","DK","V","S","LP","ŠK","8",""];
+const HODINY = {D:11.5,N:11.5,DD:11.5,FH:11.5,R:8,S:8,DK:8,F8:8,"8":8,V:0,LP:0,ŠK:0,"":0};
+const NAZVY = {D:"Denní",N:"Noční",R:"Ranní",DD:"Dovolená dl.",FH:"Free FH",DK:"Dovolená kr.",F8:"Free F8",V:"Volno",S:"Sál",LP:"LP",ŠK:"Školení","8":"Svátek","":"Smazat"};
+const BARVY = {
+  D:{bg:"#BDD7EE",col:"#1F4E79"},N:{bg:"#F4B8B8",col:"#8B0000"},
+  DD:{bg:"#9DC3E6",col:"#1F4E79"},FH:{bg:"#FFE6CC",col:"#7B3F00"},
+  R:{bg:"#D5E8D4",col:"#375623"},S:{bg:"#D9B8F4",col:"#5B0E91"},
+  DK:{bg:"#E2EFDA",col:"#375623"},F8:{bg:"#FFF2CC",col:"#7B6000"},
+  "8":{bg:"#FFD966",col:"#7B3F00"},V:{bg:"#F2F2F2",col:"#888"},
+  LP:{bg:"#EDEDED",col:"#888"},ŠK:{bg:"#EDEDED",col:"#888"},
+  "":{bg:"#fee",col:"#c00"}
+};
+const MESICE=["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
+const DNY_SHORT=["Ne","Po","Út","St","Čt","Pá","So"];
+const SVATKY={
+  "2026-05-01":1,"2026-05-08":1,"2026-07-05":1,"2026-07-06":1,"2026-09-28":1,"2026-10-28":1,"2026-11-17":1,"2026-12-24":1,"2026-12-25":1,"2026-12-26":1,
+  "2027-01-01":1,"2027-03-26":1,"2027-03-29":1,"2027-05-01":1,"2027-05-08":1,"2027-07-05":1,"2027-07-06":1,"2027-09-28":1,"2027-10-28":1,"2027-11-17":1,"2027-12-24":1,"2027-12-25":1,"2027-12-26":1,
+  "2028-01-01":1,"2028-03-14":1,"2028-03-17":1,"2028-05-01":1,"2028-05-08":1,"2028-07-05":1,"2028-07-06":1,"2028-09-28":1,"2028-10-28":1,"2028-11-17":1,"2028-12-24":1,"2028-12-25":1,"2028-12-26":1
+};
+
+let rok=2027,mes=new Date().getMonth()+1;
+let data={};
+let modalZi=-1,modalD=-1;
+
+function sk(z,d){return `${rok}|${mes}|${z}|${d}`}
+function ds(d){return `${rok}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+function getS(z,d){return data[sk(z,d)]||""}
+function setS(z,d,s){if(s)data[sk(z,d)]=s;else delete data[sk(z,d)];}
+function pocetDni(){return new Date(rok,mes,0).getDate()}
+function wd(d){return new Date(rok,mes-1,d).getDay()}
+function isWe(d){let w=wd(d);return w===0||w===6}
+function isSv(d){return SVATKY[ds(d)]===1}
+
+function openModal(zi,d){
+  modalZi=zi;modalD=d;
+  document.getElementById('modal-title').textContent=`${ZAM[zi]} – ${d}. ${MESICE[mes-1]}`;
+  const grid=document.getElementById('modal-grid');
+  grid.innerHTML='';
+  SMENY.forEach(s=>{
+    const b=document.createElement('button');
+    b.className='modal-btn'+(s===''?' clear':'');
+    b.style.background=s?BARVY[s].bg:'#f0f0f0';
+    b.style.color=s?BARVY[s].col:'#888';
+    b.textContent=s||'✕';
+    b.title=NAZVY[s]+(s?` (${HODINY[s]}h)`:'');
+    b.onclick=()=>{setS(ZAM[zi],d,s);closeModal();render()};
+    grid.appendChild(b);
+  });
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(e){
+  if(!e||e.target===document.getElementById('modal'))
+    document.getElementById('modal').classList.remove('open');
+}
+
+function render(){
+  const dni=pocetDni();
+  const tbl=document.getElementById('tbl');
+  let html='<thead><tr><th class="col-name">Zaměstnanec</th>';
+  for(let d=1;d<=dni;d++){
+    let w=wd(d),sv=isSv(d),we=isWe(d);
+    let bg=sv?'background:#fff3cd':'';
+    let col=sv?'color:#b45309':(we?'color:#aaa':'');
+    html+=`<th style="${bg};${col};min-width:28px;width:28px">${d}<br><span style="font-size:9px;font-weight:400">${DNY_SHORT[w]}</span></th>`;
+  }
+  html+='<th style="min-width:42px">Sm.</th><th style="min-width:52px">Hodin</th></tr></thead><tbody>';
+
+  ZAM.forEach((z,zi)=>{
+    let odpr=0,hod=0;
+    html+=`<tr><td class="col-name">${z}</td>`;
+    for(let d=1;d<=dni;d++){
+      let s=getS(z,d),we=isWe(d),sv=isSv(d);
+      let cellBg=s?BARVY[s].bg:(we?'#ede9e0':(sv?'#fff8e6':''));
+      let cellCol=s?BARVY[s].col:'#ccc';
+      if(s&&HODINY[s]>0){odpr++;hod+=HODINY[s];}
+      html+=`<td class="smena-cell" data-zi="${zi}" data-d="${d}" style="background:${cellBg};color:${cellCol}">${s}</td>`;
+    }
+    html+=`<td class="col-sum">${odpr}</td><td class="col-sum2">${hod.toFixed(1)}</td></tr>`;
+  });
+
+  // Řádek obsazenosti
+  html+='<tr class="total-row"><td class="col-name">Obsazeno</td>';
+  let tSm=0,tH=0;
+  for(let d=1;d<=dni;d++){
+    let cnt=ZAM.filter((_,zi)=>{let s=getS(ZAM[zi],d);return s&&HODINY[s]>0}).length;
+    html+=`<td>${cnt||''}</td>`;
+  }
+  ZAM.forEach((_,zi)=>{for(let d=1;d<=dni;d++){let s=getS(ZAM[zi],d);if(s){tSm++;tH+=HODINY[s]||0;}}});
+  html+=`<td>${tSm}</td><td>${tH.toFixed(1)}</td></tr></tbody>`;
+  tbl.innerHTML=html;
+
+  tbl.querySelectorAll('.smena-cell').forEach(c=>{
+    c.addEventListener('click',()=>openModal(+c.dataset.zi,+c.dataset.d));
+  });
+
+  let obsD=0,obsN=0;
+  ZAM.forEach((_,zi)=>{for(let d=1;d<=dni;d++){let s=getS(ZAM[zi],d);if(s==='D')obsD++;if(s==='N')obsN++;}});
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-val" style="color:#1F4E79">${tSm}</div><div class="stat-lbl">Směn celkem</div></div>
+    <div class="stat"><div class="stat-val" style="color:#375623">${tH.toFixed(1)}</div><div class="stat-lbl">Hodin celkem</div></div>
+    <div class="stat"><div class="stat-val" style="color:#1F4E79">${obsD}</div><div class="stat-lbl">Denních (D)</div></div>
+    <div class="stat"><div class="stat-val" style="color:#8B0000">${obsN}</div><div class="stat-lbl">Nočních (N)</div></div>
+    <div class="stat"><div class="stat-val" style="color:#555">${MESICE[mes-1]} ${rok}</div><div class="stat-lbl">Aktuální měsíc</div></div>
+  `;
+}
+
+// Selecty
+const selMes=document.getElementById('sel-mes');
+MESICE.forEach((m,i)=>{let o=document.createElement('option');o.value=i+1;o.textContent=m;if(i+1===mes)o.selected=true;selMes.appendChild(o);});
+selMes.addEventListener('change',()=>{mes=+selMes.value;render()});
+document.getElementById('sel-rok').addEventListener('change',e=>{rok=+e.target.value;render()});
+
+// Legenda
+const legEl=document.getElementById('leg');
+Object.entries(BARVY).filter(([k])=>k!=='').forEach(([k,v])=>{
+  let d=document.createElement('div');d.className='leg-item';
+  d.innerHTML=`<div class="leg-dot" style="background:${v.bg};color:${v.col}">${k}</div><span>${NAZVY[k]} · ${HODINY[k]}h</span>`;
+  legEl.appendChild(d);
+});
+legEl.insertAdjacentHTML('beforeend','<div class="leg-hint">Klikni na buňku → vyber směnu z menu · Tisk = Ctrl+P</div>');
+
+// CSV export
+function exportCSV(){
+  const dni=pocetDni();
+  let csv=`Zaměstnanec,${Array.from({length:dni},(_,i)=>i+1).join(',')},Směn,Hodin\n`;
+  ZAM.forEach((z,zi)=>{
+    let row=[z];let odpr=0,hod=0;
+    for(let d=1;d<=dni;d++){let s=getS(z,d);row.push(s);if(s&&HODINY[s]>0){odpr++;hod+=HODINY[s];}}
+    row.push(odpr,hod.toFixed(1));
+    csv+=row.join(',')+'\n';
+  });
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=`smeny_${rok}_${String(mes).padStart(2,'0')}.csv`;
+  a.click();
+}
+
+render();
+</script>
+</body>
+</html>
