@@ -60,6 +60,9 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
 .modal-btn.clear{background:#f0f0f0;color:#888}
 .modal-close{width:100%;padding:8px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#555}
 .modal-close:hover{background:#e0e0e0}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
 @media print{
   body{background:#fff}
   .top .controls,.legenda .leg-hint,.modal-bg,.sync-status{display:none!important}
@@ -278,6 +281,7 @@ function render(){
   let obsD=0,obsN=0;
   ZAM.forEach(z=>{for(let d=1;d<=dni;d++){let s=getS(z,d);if(s==='D')obsD++;if(s==='N')obsN++;}});
   renderStats();
+  renderPlanHodin();
   document.getElementById('stats').innerHTML=`
     <div class="stat"><div class="stat-val" style="color:#1F4E79">${tSm}</div><div class="stat-lbl">Směn celkem</div></div>
     <div class="stat"><div class="stat-val" style="color:#375623">${tH.toFixed(1)}</div><div class="stat-lbl">Hodin celkem</div></div>
@@ -350,6 +354,63 @@ function renderStats(){
     });
     html += `<td style="text-align:center;padding:3px 3px;font-weight:700;color:#1F4E79">${celkem}</td>`;
     html += `<td style="text-align:center;padding:3px 3px;font-weight:700;color:#375623">${hodCelkem.toFixed(1)}</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// Tabulka plánovaných hodin
+
+const PLAN_HODINY = {
+  "Sosnar":    {os:"52842", jmeno:"Sosnar František",   h:[169,151.5,170,157.5,162,161,162,165.5,169,163.5,162,164.5]},
+  "Záměčník": {os:"52874", jmeno:"Záměčník Martin",    h:[170,150.5,88.5,88.5,85,89.5,88.5,85,88.5,88.5,85,83.5]},
+  "Cenek":     {os:"52884", jmeno:"Cenek Dalibor",      h:[166.5,162,166.5,173.5,155,174.5,162,165.5,165.5,158.5,150.5,157.5]},
+  "Komosný":   {os:"3641",  jmeno:"Komosný Jan",        h:[162,157.5,170,157.5,162,162,162,162,166.5,165.5,161,169.5]},
+  "Kusák":     {os:"1667",  jmeno:"Klusák Jakub",       h:[158.5,166.5,170,165.5,165.5,148,173.5,170,162,151.5,161,165.5]},
+  "Máj":       {os:"9042",  jmeno:"Moj Václav",         h:[165.5,165.5,162,158.5,157.5,166.5,165.5,165.5,162,169,163.5,156.5]},
+  "Levák":     {os:"9771",  jmeno:"Levák Jozef",        h:[176,160,176,176,168,176,184,168,176,176,168,184]},
+  "Buchta":    {os:"",      jmeno:"Buchta",              h:[0,0,0,0,0,0,0,0,0,0,0,0]}
+};
+
+function renderPlanHodin(){
+  let el = document.getElementById('plan-hodin');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'plan-hodin';
+    el.style.cssText = 'margin-top:16px;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:hidden;display:inline-block;min-width:300px';
+    document.querySelector('.main').appendChild(el);
+  }
+
+  const mesKratce = ['Led','Úno','Bře','Dub','Kvě','Čer','Čvc','Srp','Zář','Říj','Lis','Pro'];
+
+  let html = '<div style="padding:6px 10px;background:#1F4E79;color:#fff;font-weight:600;font-size:11px">Plán hodin 2026 – roční přehled</div>';
+  html += '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;table-layout:fixed">';
+  html += '<thead><tr style="background:#1F4E79">';
+  html += '<th style="text-align:left;padding:4px 6px;font-weight:600;color:#aac8e8;font-size:9px;width:44px">Os. č.</th>';
+  html += '<th style="text-align:left;padding:4px 8px;font-weight:600;color:#fff;width:110px">Jméno</th>';
+  mesKratce.forEach((m, mi) => {
+    const isAkt = (mi+1) === mes && rok === 2026;
+    const bg = isAkt ? 'background:#FFD966;color:#7B3F00;border-radius:3px;' : 'color:#fff;';
+    html += `<th style="padding:4px 3px;text-align:center;width:38px;font-weight:700;${bg}">${m}</th>`;
+  });
+  html += '<th style="padding:4px 4px;text-align:center;width:48px;color:#9FE1CB;font-weight:700">Celkem</th>';
+  html += '</tr></thead><tbody>';
+
+  ZAM.forEach((z, zi) => {
+    const p = PLAN_HODINY[z];
+    if(!p) return;
+    const celkem = p.h.reduce((a,b)=>a+b,0);
+    html += `<tr style="border-bottom:1px solid #f0f0f0${zi%2===1?';background:#f7faff':''}">`;
+    html += `<td style="padding:3px 6px;color:#888;font-size:9px">${p.os}</td>`;
+    html += `<td style="padding:3px 8px;font-weight:600;color:#1a1a2e;text-align:left">${p.jmeno}</td>`;
+    p.h.forEach((h, mi) => {
+      const isAkt = (mi+1) === mes && rok === 2026;
+      const bg = isAkt ? 'background:#e8f0fe;font-weight:700;' : '';
+      html += `<td style="text-align:center;padding:2px 2px;${bg}"><input type="number" step="0.5" value="${h}" onchange="PLAN_HODINY['${z}'].h[${mi}]=+this.value;renderPlanHodin();" style="width:36px;text-align:center;border:none;background:transparent;font-size:10px;color:#1a1a2e;padding:0"></td>`;
+    });
+    html += `<td style="text-align:center;padding:3px 4px;font-weight:700;color:#375623">${celkem % 1 === 0 ? celkem : celkem.toFixed(1)}</td>`;
     html += '</tr>';
   });
 
