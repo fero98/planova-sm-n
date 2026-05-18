@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -66,6 +65,22 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
   .top .controls,.legenda .leg-hint,.modal-bg,.sync-status{display:none!important}
   .tbl-card,.stat{box-shadow:none;border:1px solid #ddd}
   .smena-cell{cursor:default}
+  #detail-stats{display:none!important}
+}
+@media print and (orientation:landscape){
+  @page{size:A3 landscape;margin:8mm}
+  body{font-size:10px}
+  .main{padding:4px}
+  .stats{gap:4px;margin-bottom:8px}
+  .stat{padding:6px 8px}
+  .stat-val{font-size:16px}
+  .stat-lbl{font-size:9px}
+  table{font-size:9px}
+  thead th{padding:4px 2px;font-size:9px}
+  .smena-cell{font-size:9px;padding:3px 1px;min-width:22px;width:22px}
+  td.col-name{min-width:70px;width:70px;font-size:9px}
+  .top{padding:8px 12px}
+  .top h1{font-size:14px}
 }
 </style>
 </head>
@@ -81,6 +96,7 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
     <select id="sel-mes"></select>
     <button class="btn-secondary" onclick="exportCSV()">⬇ CSV</button>
     <button class="btn-primary" onclick="window.print()">🖨 Tisk</button>
+    <button class="btn-secondary" onclick="printPDF()">📄 PDF A3</button>
     <div class="sync-status"><span class="sync-dot" id="sync-dot"></span><span id="sync-txt">Připojuji...</span></div>
   </div>
 </div>
@@ -118,8 +134,8 @@ const HODINY = {D:11.5,N:11.5,DD:11.5,FH:11.5,R:8,S:8,DK:8,F8:8,"8":8,V:0,LP:0,�
 const NAZVY = {D:"Denní",N:"Noční",R:"Ranní",DD:"Dovolená dl.",FH:"Free FH",DK:"Dovolená kr.",F8:"Free F8",V:"Volno",S:"Sál",LP:"LP",ŠK:"Školení","8":"Svátek","":"Smazat"};
 const BARVY = {
   D:{bg:"#BDD7EE",col:"#1F4E79"},N:{bg:"#F4B8B8",col:"#8B0000"},
-  DD:{bg:"#9DC3E6",col:"#1F4E79"},FH:{bg:"#FFE6CC",col:"#7B3F00"},
-  R:{bg:"#D5E8D4",col:"#375623"},S:{bg:"#D9B8F4",col:"#5B0E91"},
+  DD:{bg:"#E2EFDA",col:"#375623"},FH:{bg:"#FFE6CC",col:"#7B3F00"},
+  R:{bg:"#BDD7EE",col:"#1F4E79"},S:{bg:"#D9B8F4",col:"#5B0E91"},
   DK:{bg:"#E2EFDA",col:"#375623"},F8:{bg:"#FFF2CC",col:"#7B6000"},
   "8":{bg:"#FFD966",col:"#7B3F00"},V:{bg:"#F2F2F2",col:"#888"},
   LP:{bg:"#EDEDED",col:"#888"},ŠK:{bg:"#EDEDED",col:"#888"},
@@ -237,7 +253,7 @@ function render(){
     html+=`<tr><td class="col-name">${z}</td>`;
     for(let d=1;d<=dni;d++){
       let s=getS(z,d),we=isWe(d),sv=isSv(d);
-      let cellBg=s?BARVY[s].bg:(we?'#ede9e0':(sv?'#fff8e6':''));
+      let cellBg=s?BARVY[s].bg:(we?'#c6e0b4':(sv?'#fff8e6':''));
       let cellCol=s?BARVY[s].col:'#ccc';
       if(s&&HODINY[s]>0){odpr++;hod+=HODINY[s];}
       html+=`<td class="smena-cell" data-zi="${zi}" data-d="${d}" style="background:${cellBg};color:${cellCol}">${s}</td>`;
@@ -261,6 +277,7 @@ function render(){
 
   let obsD=0,obsN=0;
   ZAM.forEach(z=>{for(let d=1;d<=dni;d++){let s=getS(z,d);if(s==='D')obsD++;if(s==='N')obsN++;}});
+  renderStats();
   document.getElementById('stats').innerHTML=`
     <div class="stat"><div class="stat-val" style="color:#1F4E79">${tSm}</div><div class="stat-lbl">Směn celkem</div></div>
     <div class="stat"><div class="stat-val" style="color:#375623">${tH.toFixed(1)}</div><div class="stat-lbl">Hodin celkem</div></div>
@@ -290,6 +307,56 @@ Object.entries(BARVY).filter(([k])=>k!=='').forEach(([k,v])=>{
 });
 legEl.insertAdjacentHTML('beforeend','<div class="leg-hint">Klikni na buňku → vyber směnu z menu · Tisk = Ctrl+P</div>');
 
+function renderStats(){
+  const typy = ['D','N','R','DD','DK','V','8'];
+  const nazvy = {D:'Denní',N:'Noční',R:'Ranní',DD:'Dov. dl.',DK:'Dov. kr.',V:'Volno','8':'Svátek'};
+  const barvy = {D:'#BDD7EE',N:'#F4B8B8',R:'#BDD7EE',DD:'#E2EFDA',DK:'#E2EFDA',V:'#F2F2F2','8':'#FFE0A0'};
+  const cols = {D:'#1F4E79',N:'#8B0000',R:'#1F4E79',DD:'#375623',DK:'#375623',V:'#888','8':'#7B3F00'};
+
+  let el = document.getElementById('detail-stats');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'detail-stats';
+    el.style.cssText = 'margin-top:16px;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.1);overflow:hidden;display:inline-block;min-width:300px';
+    document.querySelector('.main').appendChild(el);
+  }
+
+  const dni = pocetDni();
+  let html = '<div style="padding:6px 10px;background:#1F4E79;color:#fff;font-weight:600;font-size:11px">Přehled směn – ' + MESICE[mes-1] + ' ' + rok + '</div>';
+  html += '<div style="overflow-x:auto"><table style="width:auto;border-collapse:collapse;font-size:10px;table-layout:fixed">';
+  html += '<thead><tr style="background:#f0f4f8">';
+  html += '<th style="text-align:left;padding:4px 8px;font-weight:600;color:#1a1a2e;width:90px">Zaměstnanec</th>';
+  typy.forEach(t => {
+    html += `<th style="padding:4px 3px;text-align:center;width:36px"><span style="background:${barvy[t]};color:${cols[t]};padding:1px 5px;border-radius:3px;font-weight:700;font-size:9px">${t}</span><br><span style="font-size:8px;color:#888;font-weight:400">${nazvy[t]}</span></th>`;
+  });
+  html += '<th style="padding:4px 3px;text-align:center;width:36px;color:#1F4E79;font-weight:600">Sm.<br><span style="font-size:8px;color:#888;font-weight:400">cel.</span></th>';
+  html += '<th style="padding:4px 3px;text-align:center;width:44px;color:#375623;font-weight:600">Hodin</th>';
+  html += '</tr></thead><tbody>';
+
+  ZAM.forEach((z, zi) => {
+    const pocty = {};
+    typy.forEach(t => pocty[t] = 0);
+    let celkem = 0, hodCelkem = 0;
+    for(let d = 1; d <= dni; d++){
+      const s = getS(z, d);
+      if(s && pocty.hasOwnProperty(s)) pocty[s]++;
+      if(s) { celkem++; hodCelkem += HODINY[s] || 0; }
+    }
+    html += `<tr style="border-bottom:1px solid #f0f0f0${zi%2===1?';background:#f7faff':''}">`;
+    html += `<td style="padding:3px 8px;font-weight:600;color:#1a1a2e;text-align:left">${z}</td>`;
+    typy.forEach(t => {
+      const v = pocty[t];
+      html += `<td style="text-align:center;padding:3px 3px;color:${v>0?cols[t]:'#ccc'};font-weight:${v>0?'700':'400'}">${v > 0 ? v : '–'}</td>`;
+    });
+    html += `<td style="text-align:center;padding:3px 3px;font-weight:700;color:#1F4E79">${celkem}</td>`;
+    html += `<td style="text-align:center;padding:3px 3px;font-weight:700;color:#375623">${hodCelkem.toFixed(1)}</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
 // CSV export
 window.exportCSV=function(){
   const dni=pocetDni();
@@ -304,6 +371,16 @@ window.exportCSV=function(){
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download=`smeny_${rok}_${String(mes).padStart(2,'0')}.csv`;
   a.click();
+};
+
+// PDF tisk A3 landscape
+window.printPDF = function(){
+  const style = document.createElement('style');
+  style.id = 'pdf-style';
+  style.textContent = '@page{size:A3 landscape;margin:8mm}';
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(()=>{ const s=document.getElementById('pdf-style'); if(s) s.remove(); }, 1000);
 };
 
 // Start
