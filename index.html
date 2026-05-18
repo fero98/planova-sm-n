@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -18,6 +19,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a1a2e;mi
 .btn-primary:hover{background:#e8f0fe}
 .btn-secondary{background:rgba(255,255,255,.15);color:#fff}
 .btn-secondary:hover{background:rgba(255,255,255,.25)}
+.sync-status{font-size:11px;opacity:.8;display:flex;align-items:center;gap:5px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;display:inline-block}
+.sync-dot.offline{background:#f44336}
+.sync-dot.syncing{background:#FFC107;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .main{max-width:1400px;margin:0 auto;padding:16px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
 .stat{background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
@@ -38,9 +44,7 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
 .smena-cell{cursor:pointer;border-radius:4px;font-size:11px;font-weight:700;user-select:none;transition:transform .08s,opacity .1s;min-width:28px;width:28px;padding:5px 2px}
 .smena-cell:hover{transform:scale(1.15);opacity:.85;z-index:10;position:relative}
 .smena-cell:active{transform:scale(.95)}
-.weekend{background:#f0ede8!important}
 .weekend .smena-cell{background:#ebe8e2!important}
-.svatek-col{background:#fff8e6!important}
 .total-row td{background:#1F4E79!important;color:#fff!important;font-weight:600;font-size:11px}
 .total-row td.col-name{background:#1F4E79!important;color:#fff!important}
 .legenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding:14px 16px;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
@@ -59,7 +63,7 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
 .modal-close:hover{background:#e0e0e0}
 @media print{
   body{background:#fff}
-  .top .controls,.legenda .leg-hint,.modal-bg{display:none!important}
+  .top .controls,.legenda .leg-hint,.modal-bg,.sync-status{display:none!important}
   .tbl-card,.stat{box-shadow:none;border:1px solid #ddd}
   .smena-cell{cursor:default}
 }
@@ -77,6 +81,7 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
     <select id="sel-mes"></select>
     <button class="btn-secondary" onclick="exportCSV()">⬇ CSV</button>
     <button class="btn-primary" onclick="window.print()">🖨 Tisk</button>
+    <div class="sync-status"><span class="sync-dot" id="sync-dot"></span><span id="sync-txt">Připojuji...</span></div>
   </div>
 </div>
 
@@ -96,7 +101,17 @@ td.col-sum2{font-weight:700;font-size:12px;background:#E2EFDA!important;color:#3
   </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  databaseURL: "https://sanitari-pozadavek-na-volno-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 const ZAM = ["Sosnar","Záměčník","Cenek","Komosný","Kusák","Máj","Levák","Buchta"];
 const SMENY = ["D","N","R","DD","F8","FH","DK","V","S","LP","ŠK","8",""];
 const HODINY = {D:11.5,N:11.5,DD:11.5,FH:11.5,R:8,S:8,DK:8,F8:8,"8":8,V:0,LP:0,ŠK:0,"":0};
@@ -113,26 +128,71 @@ const BARVY = {
 const MESICE=["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 const DNY_SHORT=["Ne","Po","Út","St","Čt","Pá","So"];
 const SVATKY={
-  "2026-05-01":1,"2026-05-08":1,"2026-07-05":1,"2026-07-06":1,"2026-09-28":1,"2026-10-28":1,"2026-11-17":1,"2026-12-24":1,"2026-12-25":1,"2026-12-26":1,
+  "2025-01-01":1,"2025-04-18":1,"2025-04-21":1,"2025-05-01":1,"2025-05-08":1,"2025-07-05":1,"2025-07-06":1,"2025-09-28":1,"2025-10-28":1,"2025-11-17":1,"2025-12-24":1,"2025-12-25":1,"2025-12-26":1,
+  "2026-01-01":1,"2026-04-03":1,"2026-04-06":1,"2026-05-01":1,"2026-05-08":1,"2026-07-05":1,"2026-07-06":1,"2026-09-28":1,"2026-10-28":1,"2026-11-17":1,"2026-12-24":1,"2026-12-25":1,"2026-12-26":1,
   "2027-01-01":1,"2027-03-26":1,"2027-03-29":1,"2027-05-01":1,"2027-05-08":1,"2027-07-05":1,"2027-07-06":1,"2027-09-28":1,"2027-10-28":1,"2027-11-17":1,"2027-12-24":1,"2027-12-25":1,"2027-12-26":1,
   "2028-01-01":1,"2028-03-14":1,"2028-03-17":1,"2028-05-01":1,"2028-05-08":1,"2028-07-05":1,"2028-07-06":1,"2028-09-28":1,"2028-10-28":1,"2028-11-17":1,"2028-12-24":1,"2028-12-25":1,"2028-12-26":1
 };
 
-let rok=2027,mes=new Date().getMonth()+1;
+let rok=2027, mes=new Date().getMonth()+1;
 let data={};
-let modalZi=-1,modalD=-1;
+let modalZi=-1, modalD=-1;
+let dbListener=null;
 
 function sk(z,d){return `${rok}|${mes}|${z}|${d}`}
 function ds(d){return `${rok}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
 function getS(z,d){return data[sk(z,d)]||""}
-function setS(z,d,s){if(s)data[sk(z,d)]=s;else delete data[sk(z,d)];}
 function pocetDni(){return new Date(rok,mes,0).getDate()}
 function wd(d){return new Date(rok,mes-1,d).getDay()}
 function isWe(d){let w=wd(d);return w===0||w===6}
 function isSv(d){return SVATKY[ds(d)]===1}
 
+function setStatus(stav){
+  const dot=document.getElementById('sync-dot');
+  const txt=document.getElementById('sync-txt');
+  if(stav==='ok'){dot.className='sync-dot';txt.textContent='Synchronizováno';}
+  else if(stav==='sync'){dot.className='sync-dot syncing';txt.textContent='Ukládám...';}
+  else{dot.className='sync-dot offline';txt.textContent='Offline';}
+}
+
+function fbPath(){
+  return `smeny/${rok}/${mes}`;
+}
+
+function saveToFb(z, d, s){
+  setStatus('sync');
+  const key = `${z}__${d}`;
+  const path = `${fbPath()}/${key}`;
+  if(s){
+    set(ref(db, path), s).then(()=>setStatus('ok')).catch(()=>setStatus('err'));
+  } else {
+    remove(ref(db, path)).then(()=>setStatus('ok')).catch(()=>setStatus('err'));
+  }
+}
+
+function subscribeMonth(){
+  if(dbListener) dbListener();
+  data={};
+  const r=ref(db, fbPath());
+  dbListener=onValue(r, snap=>{
+    data={};
+    if(snap.exists()){
+      snap.forEach(child=>{
+        const parts=child.key.split('__');
+        if(parts.length===2){
+          const z=parts[0], d=parseInt(parts[1]);
+          const s=child.val();
+          data[sk(z,d)]=s;
+        }
+      });
+    }
+    setStatus('ok');
+    render();
+  }, ()=>setStatus('err'));
+}
+
 function openModal(zi,d){
-  modalZi=zi;modalD=d;
+  modalZi=zi; modalD=d;
   document.getElementById('modal-title').textContent=`${ZAM[zi]} – ${d}. ${MESICE[mes-1]}`;
   const grid=document.getElementById('modal-grid');
   grid.innerHTML='';
@@ -143,11 +203,18 @@ function openModal(zi,d){
     b.style.color=s?BARVY[s].col:'#888';
     b.textContent=s||'✕';
     b.title=NAZVY[s]+(s?` (${HODINY[s]}h)`:'');
-    b.onclick=()=>{setS(ZAM[zi],d,s);closeModal();render()};
+    b.onclick=()=>{
+      const zJmeno=ZAM[zi];
+      if(s){data[sk(zJmeno,d)]=s;}else{delete data[sk(zJmeno,d)];}
+      saveToFb(zJmeno, d, s);
+      closeModal();
+      render();
+    };
     grid.appendChild(b);
   });
   document.getElementById('modal').classList.add('open');
 }
+
 function closeModal(e){
   if(!e||e.target===document.getElementById('modal'))
     document.getElementById('modal').classList.remove('open');
@@ -178,14 +245,13 @@ function render(){
     html+=`<td class="col-sum">${odpr}</td><td class="col-sum2">${hod.toFixed(1)}</td></tr>`;
   });
 
-  // Řádek obsazenosti
   html+='<tr class="total-row"><td class="col-name">Obsazeno</td>';
   let tSm=0,tH=0;
   for(let d=1;d<=dni;d++){
-    let cnt=ZAM.filter((_,zi)=>{let s=getS(ZAM[zi],d);return s&&HODINY[s]>0}).length;
+    let cnt=ZAM.filter(z=>{let s=getS(z,d);return s&&HODINY[s]>0}).length;
     html+=`<td>${cnt||''}</td>`;
   }
-  ZAM.forEach((_,zi)=>{for(let d=1;d<=dni;d++){let s=getS(ZAM[zi],d);if(s){tSm++;tH+=HODINY[s]||0;}}});
+  ZAM.forEach(z=>{for(let d=1;d<=dni;d++){let s=getS(z,d);if(s){tSm++;tH+=HODINY[s]||0;}}});
   html+=`<td>${tSm}</td><td>${tH.toFixed(1)}</td></tr></tbody>`;
   tbl.innerHTML=html;
 
@@ -194,7 +260,7 @@ function render(){
   });
 
   let obsD=0,obsN=0;
-  ZAM.forEach((_,zi)=>{for(let d=1;d<=dni;d++){let s=getS(ZAM[zi],d);if(s==='D')obsD++;if(s==='N')obsN++;}});
+  ZAM.forEach(z=>{for(let d=1;d<=dni;d++){let s=getS(z,d);if(s==='D')obsD++;if(s==='N')obsN++;}});
   document.getElementById('stats').innerHTML=`
     <div class="stat"><div class="stat-val" style="color:#1F4E79">${tSm}</div><div class="stat-lbl">Směn celkem</div></div>
     <div class="stat"><div class="stat-val" style="color:#375623">${tH.toFixed(1)}</div><div class="stat-lbl">Hodin celkem</div></div>
@@ -206,25 +272,30 @@ function render(){
 
 // Selecty
 const selMes=document.getElementById('sel-mes');
-MESICE.forEach((m,i)=>{let o=document.createElement('option');o.value=i+1;o.textContent=m;if(i+1===mes)o.selected=true;selMes.appendChild(o);});
-selMes.addEventListener('change',()=>{mes=+selMes.value;render()});
-document.getElementById('sel-rok').addEventListener('change',e=>{rok=+e.target.value;render()});
+MESICE.forEach((m,i)=>{
+  let o=document.createElement('option');
+  o.value=i+1; o.textContent=m;
+  if(i+1===mes) o.selected=true;
+  selMes.appendChild(o);
+});
+selMes.addEventListener('change',()=>{mes=+selMes.value; subscribeMonth();});
+document.getElementById('sel-rok').addEventListener('change',e=>{rok=+e.target.value; subscribeMonth();});
 
 // Legenda
 const legEl=document.getElementById('leg');
 Object.entries(BARVY).filter(([k])=>k!=='').forEach(([k,v])=>{
-  let d=document.createElement('div');d.className='leg-item';
+  let d=document.createElement('div'); d.className='leg-item';
   d.innerHTML=`<div class="leg-dot" style="background:${v.bg};color:${v.col}">${k}</div><span>${NAZVY[k]} · ${HODINY[k]}h</span>`;
   legEl.appendChild(d);
 });
 legEl.insertAdjacentHTML('beforeend','<div class="leg-hint">Klikni na buňku → vyber směnu z menu · Tisk = Ctrl+P</div>');
 
 // CSV export
-function exportCSV(){
+window.exportCSV=function(){
   const dni=pocetDni();
   let csv=`Zaměstnanec,${Array.from({length:dni},(_,i)=>i+1).join(',')},Směn,Hodin\n`;
-  ZAM.forEach((z,zi)=>{
-    let row=[z];let odpr=0,hod=0;
+  ZAM.forEach(z=>{
+    let row=[z]; let odpr=0,hod=0;
     for(let d=1;d<=dni;d++){let s=getS(z,d);row.push(s);if(s&&HODINY[s]>0){odpr++;hod+=HODINY[s];}}
     row.push(odpr,hod.toFixed(1));
     csv+=row.join(',')+'\n';
@@ -233,9 +304,10 @@ function exportCSV(){
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download=`smeny_${rok}_${String(mes).padStart(2,'0')}.csv`;
   a.click();
-}
+};
 
-render();
+// Start
+subscribeMonth();
 </script>
 </body>
 </html>
