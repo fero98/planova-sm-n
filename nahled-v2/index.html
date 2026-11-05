@@ -171,6 +171,7 @@ input[type=number]{-moz-appearance:textfield}
 #auth-error{color:#a02626}
 .leave-overviews{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr);gap:16px;align-items:start;margin-top:24px}
 .leave-overviews .tbl-card{min-width:0}
+.proposal-box{margin-top:18px;padding:18px;background:#fff;border:1px solid #dce5e7;border-radius:12px}.proposal-box summary{cursor:pointer;font-weight:700}.proposal-people{display:flex;flex-wrap:wrap;gap:10px 16px;margin:12px 0}.proposal-people label{white-space:nowrap}.proposal-actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.proposal-box button{padding:10px 14px;border:1px solid #13786c;border-radius:7px;background:#13786c;color:white;cursor:pointer}.proposal-box p{margin:10px 0;color:#405b5f;line-height:1.5}.proposal-box h4{margin-top:18px}.proposal-box td,.proposal-box th{padding:8px}.proposal-box .tbl-wrap{max-height:540px}
 .leave-left{display:grid;gap:16px;min-width:0}
 .leave-overviews :is(#vacation,#free-hours) table{table-layout:fixed;width:100%}
 .leave-overviews :is(#vacation,#free-hours) th,.leave-overviews :is(#vacation,#free-hours) td{white-space:normal;overflow-wrap:anywhere;padding:8px 5px;line-height:1.35}
@@ -218,6 +219,7 @@ input[type=number]{-moz-appearance:textfield}
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
+  <details class="proposal-box" id="proposal"><summary>Automatický návrh směn</summary><p>Vyberte zaměstnance pro návrh. Zámečník má cíl 10 pracovních směn měsíčně. Sváteční služby, noční před svátkem a nepřítomnosti se zachovají. V návrhu se zkontroluje volno po noční a zákaz tří denních po sobě.</p><div id="proposal-people" class="proposal-people" aria-label="Zaměstnanci pro návrh"></div><button type="button" id="proposal-generate">Navrhnout směny</button><div id="proposal-result" aria-live="polite"></div></details>
   <div class="leave-overviews">
     <div class="leave-left">
       <section id="vacation" class="tbl-card" aria-label="Roční přehled dovolené"></section>
@@ -603,8 +605,8 @@ MESICE.forEach((m,i)=>{
   if(i+1===mes) o.selected=true;
   selMes.appendChild(o);
 });
-selMes.addEventListener('change',()=>{mes=+selMes.value; subscribeMonth();});
-document.getElementById('sel-rok').addEventListener('change',e=>{rok=+e.target.value; subscribeMonth();});
+selMes.addEventListener('change',()=>{resetScheduleDraft();mes=+selMes.value; subscribeMonth();});
+document.getElementById('sel-rok').addEventListener('change',e=>{resetScheduleDraft();rok=+e.target.value; subscribeMonth();});
 
 // Legenda
 const legEl=document.getElementById('leg');
@@ -739,6 +741,7 @@ window.printPDF = function(){
 };
 
 function clearCloudView(message){
+  resetScheduleDraft();
   cloudReady=false;cloudCache={};storageHealthy=false;data={};
   PLAN_HODINY=Object.fromEntries(ZAM.map(z=>[z,{jmeno:employeeName(z),h:Array(12).fill(0)}]));
   document.getElementById('planner').hidden=true;
@@ -811,6 +814,130 @@ async function startCloud(){
     });
   }catch{error.textContent='Přihlášení se nepodařilo načíst. Zkontrolujte internet a obnovte stránku.';}
 }
+function scheduleKey(obj){return JSON.stringify(Object.entries(obj||{}).sort(([a],[b])=>a.localeCompare(b)));}
+function proposeSchedule(year,month,original,previous,next,selected){
+  const days=new Date(year,month,0).getDate(),chosen=new Set(selected),fixed={},slots=[];
+  const work=new Set(['D','N','R','S']);
+  for(const [key,shift] of Object.entries(original)){
+    const [id,number,...rest]=key.split('__'),d=Number(number);
+    if(rest.length||!ZAM.includes(id)||!Number.isInteger(d)||d<1||d>days||!validShift(shift))throw Error('V uloženém měsíci je neplatná směna.');
+    const nextDate=new Date(year,month-1,d+1,12);
+    const beforeHoliday=shift==='N'&&holiday(nextDate.getFullYear(),nextDate.getMonth()+1,nextDate.getDate());
+    if(!chosen.has(id)||!['D','N','R'].includes(shift)||holiday(year,month,d)||beforeHoliday)fixed[key]=shift;
+  }
+  for(let day=1;day<=days;day++){
+    if(holiday(year,month,day))continue;
+    const wd=new Date(year,month-1,day).getDay(),needed=wd===0||wd===6?{D:1,N:1,R:0}:wd===1||wd===2?{D:2,N:1,R:1}:{D:2,N:1,R:0};
+    for(const type of ['D','R','N']){
+      let count=ZAM.filter(z=>fixed[z+'__'+day]===type).length;
+      if(count>needed[type])throw Error('Dne '+day+'. je více zachovaných směn '+type+', než vyžaduje obsazení.');
+      while(count++<needed[type]){
+        let candidates=selected.filter(z=>!fixed[z+'__'+day]);
+        if(!candidates.length)throw Error('Dne '+day+'. není pro směnu '+type+' dostupný žádný vybraný zaměstnanec.');
+        slots.push({day,type,candidates});
+      }
+    }
+  }
+  const prevdays=new Date(year,month-1,0).getDate();
+  const adjacent=(z,d)=>d<1?(month>1?previous[z+'__'+(prevdays+d)]:undefined):d>days?(month<12?next[z+'__'+(d-days)]:undefined):undefined;
+  function evaluate(assign){
+    let hard=0,soft=0,grid=Object.fromEntries(ZAM.map(z=>[z,Array(days+1).fill('')])),stats=Object.fromEntries(selected.map(z=>[z,{count:0,hours:0,night:0,weekend:0,day:0}]));
+    for(const [key,value] of Object.entries(fixed)){let [z,d]=key.split('__');grid[z][+d]=value;}
+    for(let i=0;i<slots.length;i++){const {day,type}=slots[i],z=assign[i];if(grid[z][day])hard+=1;else grid[z][day]=type;}
+    for(const z of ZAM){
+      let shift=d=>d<1||d>days?adjacent(z,d):grid[z][d];
+      for(let d=1;d<=days;d++){
+        let value=shift(d),before=shift(d-1),after=shift(d+1);
+        if(value==='N'&&work.has(after))hard++;
+        if(d===1&&before==='N'&&work.has(value))hard++;
+        if(value==='D'&&shift(d-1)==='D'&&shift(d-2)==='D')hard++;
+        if(d===days&&value==='D'&&after==='D'&&shift(d+2)==='D')hard++;
+        if(d===days&&value==='D'&&shift(d-1)==='D'&&after==='D')hard++;
+        if(stats[z]&&work.has(value)){let s=stats[z],w=new Date(year,month-1,d).getDay();s.count++;s.hours+=HODINY[value];if(value==='N')s.night++;if(value==='D')s.day++;if(w===0||w===6)s.weekend++;}
+        if(d>=4&&work.has(value)&&work.has(shift(d-1))&&work.has(shift(d-2))&&work.has(shift(d-3)))soft+=12;
+      }
+    }
+    if(stats[ZAM[1]])hard+=Math.abs(stats[ZAM[1]].count-10);
+    const other=selected.filter(z=>z!==ZAM[1]);
+    if(other.length){for(const prop of ['hours','day','night','weekend']){let vals=other.map(z=>stats[z][prop]),avg=vals.reduce((a,b)=>a+b,0)/vals.length;for(const v of vals)soft+=(v-avg)**2*({hours:.04,day:2,night:5,weekend:8})[prop];}}
+    return {hard,soft,grid,stats};
+  }
+  let best=null,bestScore=Infinity;
+  for(let attempt=0;attempt<8;attempt++){
+    let assign=slots.map(s=>s.candidates[Math.floor(Math.random()*s.candidates.length)]),ev=evaluate(assign),score=ev.hard*10000+ev.soft;
+    for(let i=0;i<13000;i++){
+      if(!slots.length)break;
+      const pos=Math.floor(Math.random()*slots.length),choices=slots[pos].candidates,old=assign[pos],replacement=choices[Math.floor(Math.random()*choices.length)];if(old===replacement)continue;
+      assign[pos]=replacement;let trial=evaluate(assign),value=trial.hard*10000+trial.soft,temp=Math.max(.5,6000*(1-i/13000));
+      if(value<score||Math.random()<Math.exp((score-value)/temp)){ev=trial;score=value;}else assign[pos]=old;
+      if(score<bestScore){bestScore=score;best=assign.slice();}
+    }
+    if(!slots.length){best=[];break;}
+    if(bestScore<10000&&attempt>=2)break;
+  }
+  const result=evaluate(best||[]);
+  if(result.hard)throw Error('Nepodařilo se najít návrh splňující všechna pevná pravidla. Zkuste vybrat více zaměstnanců nebo upravit zadané směny.');
+  const resultMonth={...fixed};slots.forEach((s,i)=>resultMonth[best[i]+'__'+s.day]=s.type);
+  return {month:resultMonth,stats:result.stats};
+}
+
+let scheduleDraft=null;
+function resetScheduleDraft(){scheduleDraft=null;document.getElementById('proposal-result').innerHTML='';}
+function initProposalControls(){
+  const list=document.getElementById('proposal-people');
+  list.innerHTML=ZAM.map((id,i)=>'<label><input type="checkbox" value="'+id+'" '+(i<6?'checked':'')+'> '+employeeName(id)+'</label>').join('');
+}
+document.getElementById('proposal-people').addEventListener('change',resetScheduleDraft);
+document.getElementById('proposal-generate').addEventListener('click',()=>{
+  const output=document.getElementById('proposal-result');
+  if(!storageHealthy||!cloudReady||!cloudConnected||cloudBusy){output.textContent='Počkejte na připojení a načtení společných dat.';return;}
+  const selected=Array.from(document.querySelectorAll('#proposal-people input:checked')).map(e=>e.value);
+  if(!selected.length){output.textContent='Vyberte alespoň jednoho zaměstnance.';return;}
+  scheduleDraft=null;output.textContent='Hledám návrh podle pravidel…';
+  const year=rok,month=mes,original={...readObject('shifts:'+rok+':'+mes)},previous=month>1?{...readObject('shifts:'+rok+':'+(month-1))}:{},next=month<12?{...readObject('shifts:'+rok+':'+(month+1))}:{};
+  setTimeout(()=>{
+    try{
+      if(year!==rok||month!==mes||!cloudReady)throw Error('Vybraný měsíc se změnil; spusťte návrh znovu.');
+      const draft=proposeSchedule(year,month,original,previous,next,selected);
+      scheduleDraft={proposed:draft.month,stats:draft.stats,year,month,original,previous,next};
+      let html='<p>Navržený rozpis zatím není uložený. Zadané nepřítomnosti a sváteční služby zůstávají zachované. Stávající D, N a R mimo svátky mohou být nahrazeny. Po uložení lze jednotlivé služby upravit v rozpisu.</p><p>Kontrola odpočinku pracuje s kalendářními dny; přesné časy a '+(month===1?'předchozí rok':month===12?'následující rok':'podmínky pracoviště')+' nejsou ověřeny. Čtyři pracovní dny po sobě se návrh snaží omezit.</p>';
+      const emptyHolidays=Array.from({length:new Date(year,month,0).getDate()},(_,i)=>i+1).filter(d=>holiday(year,month,d)&&!ZAM.some(z=>['D','N','R'].includes(original[z+'__'+d])));
+      if(emptyHolidays.length)html+='<p>Upozornění: svátek bez zadaných služeb ('+emptyHolidays.join(', ')+'.) zůstal prázdný. Doplňte jej ručně před vytvořením návrhu.</p>';
+      const longRuns=[];for(const z of ZAM){let run=0;for(let d=1;d<=new Date(year,month,0).getDate();d++){run=['D','N','R','S'].includes(draft.month[z+'__'+d])?run+1:0;if(run===4)longRuns.push(employeeName(z)+' (od '+(d-3)+'.)');}}
+      if(longRuns.length)html+='<p>Upozornění: čtyři či více pracovních dnů po sobě: '+longRuns.join(', ')+'.</p>';
+      html+='<div class="tbl-wrap"><table><thead><tr><th>Den</th><th>Denní D</th><th>Ranní R</th><th>Noční N</th><th>Další záznamy</th></tr></thead><tbody>';
+      for(let d=1;d<=new Date(year,month,0).getDate();d++){
+        const names=type=>ZAM.filter(z=>draft.month[z+'__'+d]===type).map(employeeName).join(', ')||'—';
+        const extras=ZAM.filter(z=>draft.month[z+'__'+d]&&!['D','N','R'].includes(draft.month[z+'__'+d])).map(z=>employeeName(z)+': '+draft.month[z+'__'+d]).join(', ')||'—';
+        html+='<tr><th scope="row">'+d+'. '+DNY_SHORT[new Date(year,month-1,d).getDay()]+(holiday(year,month,d)?' · svátek':'')+'</th><td>'+names('D')+'</td><td>'+names('R')+'</td><td>'+names('N')+'</td><td>'+extras+'</td></tr>';
+      }
+      html+='</tbody></table></div><h4>Součty zapojených zaměstnanců</h4><div class="tbl-wrap"><table><thead><tr><th>Zaměstnanec</th><th>Směn</th><th>Hodin</th><th>D</th><th>N</th><th>Víkendy</th></tr></thead><tbody>';
+      for(const z of selected){const v=draft.stats[z];html+='<tr><th scope="row">'+employeeName(z)+'</th><td>'+v.count+'</td><td>'+hoursText(v.hours)+'</td><td>'+v.day+'</td><td>'+v.night+'</td><td>'+v.weekend+'</td></tr>';}
+      html+='</tbody></table></div><div class="proposal-actions"><button type="button" id="proposal-approve">Schválit a uložit návrh</button><button type="button" id="proposal-discard">Zahodit návrh</button></div><p id="proposal-status" role="status"></p>';
+      output.innerHTML=html;
+      document.getElementById('proposal-discard').addEventListener('click',resetScheduleDraft);
+      document.getElementById('proposal-approve').addEventListener('click',applyScheduleDraft);
+    }catch(error){output.textContent=error.message;}
+  },30);
+});
+async function applyScheduleDraft(){
+  const draft=scheduleDraft,status=document.getElementById('proposal-status');
+  if(!draft||!cloudUser||!cloudReady||!cloudConnected||cloudBusy||!storageHealthy||draft.year!==rok||draft.month!==mes){if(status)status.textContent='Návrh nelze uložit. Zkontrolujte připojení a vytvořte jej znovu.';return;}
+  document.getElementById('proposal-approve').disabled=true;cloudBusy=true;storageHealthy=false;setStatus('sync');status.textContent='Ukládám schválený návrh…';
+  try{
+    const result=await cloud.runTransaction(cloud.ref(cloud.db,'years/'+draft.year+'/shifts'),current=>{
+      const all=current||{},m=draft.month;
+      if(scheduleKey(all[m]||{})!==scheduleKey(draft.original)||(m>1&&scheduleKey(all[m-1]||{})!==scheduleKey(draft.previous))||(m<12&&scheduleKey(all[m+1]||{})!==scheduleKey(draft.next)))return;
+      const updated={...all};
+      updated[m]=Object.keys(draft.proposed||{}).length?draft.proposed:null;return updated;
+    },{applyLocally:false});
+    if(!result.committed)throw Error('Rozpis se mezitím změnil. Vytvořte nový návrh; nic nebylo přepsáno.');
+    scheduleDraft=null;document.getElementById('proposal-result').textContent='Schválený návrh byl uložen.';
+  }catch(error){status.textContent=error.message||'Návrh se nepodařilo uložit.';}
+  finally{cloudBusy=false;if(cloudReady&&cloudUser)loadMonth();}
+}
+
+initProposalControls();
 // Start
 if(CLOUD_MODE)startCloud();else subscribeMonth();
 </script>
