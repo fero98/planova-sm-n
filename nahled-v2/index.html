@@ -520,7 +520,7 @@ function renderFreeHours(){
   const target=document.getElementById('free-hours');
   let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 14 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
   try{
-    const annual=freeHoursSummary(rok), first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok);
+    const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
     html+='<p style="padding:0 18px 12px;color:#627781;font-size:12px">Přehled zahrnuje i budoucí plánované směny; splnění podle plánu není potvrzením skutečného nároku. FH = 11,5 h, F8 = 8 h.</p>';
     html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená leden–červen</th><th scope="col">Podmínka 40 h</th><th scope="col">Free Hours leden–červen</th><th scope="col">Ze 14 h do 30. června</th></tr></thead><tbody>';
@@ -538,13 +538,7 @@ function renderFreeHours(){
       const remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining)):'Nárok zatím nesplněn';
       html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td>'+vacation+'</td><td>'+status+'</td><td>'+hoursText(row.used)+'</td><td>'+remaining+'</td></tr>';
     }
-    html+='</tbody></table></div><p style="padding:16px 18px 8px;font-weight:700">Roční evidence Free Hours</p><p style="padding:0 18px 10px;color:#627781;font-size:12px">Roční limit je orientační a nesděluje, kolik hodin už vzniklo jako nárok.</p>';
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Roční limit</th><th scope="col">Zadané volno za rok</th><th scope="col">Rozdíl do limitu</th></tr></thead><tbody>';
-    for(const row of annual){
-      const left=row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining);
-      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td><input type="number" min="0" max="8760" step="0.5" data-free-hours="'+row.id+'" '+(storageHealthy?'':'disabled')+' aria-label="'+employeeName(row.id)+', nárok Free Hours '+rok+' v hodinách" value="'+row.allowance+'" style="width:85px;padding:8px;border:1px solid #c7dcd6;border-radius:6px"> h</td><td>'+hoursText(row.used)+'</td><td style="font-weight:700;color:'+(row.remaining<0?'#a02626':'#176652')+'">'+left+'</td></tr>';
-    }
-    html+='</tbody></table></div><p style="padding:12px 18px;font-size:12px;color:#627781">Roční limit lze upravit. Změny jsou společné pro oba správce.</p>';
+    html+='</tbody></table></div>';
   }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled Free Hours nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců.</p>';}
   target.innerHTML=html;
 }
