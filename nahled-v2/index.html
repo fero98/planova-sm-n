@@ -171,11 +171,12 @@ input[type=number]{-moz-appearance:textfield}
 #auth-error{color:#a02626}
 .leave-overviews{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr);gap:16px;align-items:start;margin-top:24px}
 .leave-overviews .tbl-card{min-width:0}
-.leave-overviews table{table-layout:fixed;width:100%}
-.leave-overviews th,.leave-overviews td{white-space:normal;overflow-wrap:anywhere;padding:8px 5px;line-height:1.35}
-.leave-overviews thead th{font-size:11px}
-.leave-overviews tbody th[scope="row"]{padding:9px 7px!important;font-size:12px!important}
-.leave-overviews input[type="number"]{width:60px!important;max-width:75%;padding:6px!important}
+.leave-left{display:grid;gap:16px;min-width:0}
+.leave-overviews :is(#vacation,#free-hours) table{table-layout:fixed;width:100%}
+.leave-overviews :is(#vacation,#free-hours) th,.leave-overviews :is(#vacation,#free-hours) td{white-space:normal;overflow-wrap:anywhere;padding:8px 5px;line-height:1.35}
+.leave-overviews :is(#vacation,#free-hours) thead th{font-size:11px}
+.leave-overviews :is(#vacation,#free-hours) tbody th[scope="row"]{padding:9px 7px!important;font-size:12px!important}
+.leave-overviews :is(#vacation,#free-hours) input[type="number"]{width:60px!important;max-width:75%;padding:6px!important}
 @media(max-width:1000px){.leave-overviews{grid-template-columns:minmax(0,1fr)}}
 @media print{.leave-overviews{display:block}.leave-overviews .tbl-card{margin-bottom:12px}}
 @media print{#auth-panel{display:none}}
@@ -208,7 +209,7 @@ input[type=number]{-moz-appearance:textfield}
 
 <main class="main">
 <div class="workspace-intro"><div><div class="eyebrow">Přehled týmu / plánování</div><h2>Každá směna na svém místě.</h2><p>Měsíční rozpis, obsazenost a plán hodin v jednom přehledu.</p></div><div class="year-badge" id="year-badge">2027</div></div>
-<nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#holidays">Svátky</a><a href="#vacation">Dovolená</a><a href="#free-hours">Free Hours</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
+<nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#vacation">Dovolená</a><a href="#free-hours">Free Hours</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
 <p class="preview-note">Společný rozpis pro dva správce. Změny se ukládají do nové databáze. Původní rozpis i dřívější místní data zůstávají oddělené.</p>
 <p id="error-message" role="alert"></p>
   <div class="stats" id="stats"></div>
@@ -217,16 +218,15 @@ input[type=number]{-moz-appearance:textfield}
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
-  <section id="holidays" class="tbl-card" style="margin-top:24px" aria-label="Přehled svátečních směn"></section>
   <div class="leave-overviews">
-    <section id="vacation" class="tbl-card" aria-label="Roční přehled dovolené"></section>
+    <div class="leave-left">
+      <section id="vacation" class="tbl-card" aria-label="Roční přehled dovolené"></section>
+      <div id="detail-stats"></div>
+      <div id="plan-hodin"></div>
+    </div>
     <section id="free-hours" class="tbl-card" aria-label="Roční přehled Free Hours"></section>
   </div>
   <details class="rules-note"><summary>Pravidla výpočtu a zkratky</summary><p>Obsazenost a pracovní směny zahrnují D, N, R a S. FH a F8 přidávají 11,5 a 8 hodin, ale ne pracovní směnu. LP a ŠK mají 0 hodin. Volno V má 0 hodin a není pracovní směna. DD a DK odečítají 11,5 a 8 hodin dovolené. Roční plán hodin se vyplňuje samostatně.</p></details>
-  <div style="display:flex;gap:16px;margin-top:16px;align-items:flex-start;flex-wrap:wrap">
-    <div id="detail-stats"></div>
-    <div id="plan-hodin"></div>
-  </div>
 </main>
 
 <dialog id="modal" aria-labelledby="modal-title">
@@ -417,7 +417,6 @@ function render(){
   document.getElementById('year-badge').textContent=rok;
   renderVacation();
   renderFreeHours();
-  renderHolidays();
   const dni=pocetDni();
   const tbl=document.getElementById('tbl');
   let html='<thead><tr><th class="col-name">Zaměstnanec</th>';
@@ -562,31 +561,6 @@ document.getElementById('free-hours').addEventListener('change',async event=>{
   catch(error){reportError('Nárok Free Hours se nepodařilo uložit. Původní hodnota zůstává.');}
   renderFreeHours();
 });
-function renderHolidays(){
-  const target=document.getElementById('holidays');
-  let html='<div class="section-heading"><div><h3>Svátky a směny · '+rok+'</h3><p>Údaje se aktualizují podle rozpisu. D = denní, N = noční; před svátkem se zobrazuje N z předchozího dne.</p></div></div>';
-  try{
-    const months={};
-    for(let month=1;month<=12;month++){
-      months[month]=readObject('shifts:'+rok+':'+month);
-      for(const [key,shift] of Object.entries(months[month])){
-        const [z,day,...extra]=key.split('__');
-        if(extra.length||!ZAM.includes(z)||!/^\d+$/.test(day)||+day<1||+day>new Date(rok,month,0).getDate()||!validShift(shift))throw Error('Neplatná směna.');
-      }
-    }
-    const names=(month,day,type)=>ZAM.filter(z=>months[month][z+'__'+day]===type).map(employeeName).join(', ')||'—';
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Svátek</th><th scope="col">Noční před svátkem</th><th scope="col">Denní ve svátek</th><th scope="col">Noční ve svátek</th></tr></thead><tbody>';
-    for(let month=1;month<=12;month++)for(let day=1;day<=new Date(rok,month,0).getDate();day++){
-      if(!holiday(rok,month,day))continue;
-      const prev=new Date(rok,month-1,day-1,12), pm=prev.getMonth()+1,pd=prev.getDate();
-      const before=prev.getFullYear()!==rok?'Předchozí rok není načten':`${pd}. ${pm}. · ${names(pm,pd,'N')}`;
-      html+=`<tr><th scope="row" style="padding:12px;text-align:left">${day}. ${month}. ${rok}</th><td>${before}</td><td>${names(month,day,'D')}</td><td>${names(month,day,'N')}</td></tr>`;
-    }
-    html+=`<tr><th scope="row" style="padding:12px;text-align:left">31. 12. ${rok} · Silvestr</th><td>—</td><td>${names(12,31,'D')}</td><td>${names(12,31,'N')}</td></tr>`;
-    html+='</tbody></table></div>';
-  }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled svátků nelze načíst. Zkontrolujte připojení a uložené směny.</p>';}
-  target.innerHTML=html;
-}
 function renderVacation(){
   const target=document.getElementById('vacation');
   let html='<div class="section-heading"><div><h3>Dovolená · '+rok+'</h3><p>Celý rok · DD 11,5 h / DK 8 h · zadaná dovolená zahrnuje i budoucí termíny.</p></div></div>';
@@ -769,7 +743,7 @@ function clearCloudView(message){
   document.getElementById('planner').hidden=true;
   document.getElementById('auth-message').textContent=message;
   if(modal.open)closeModal();
-  for(const id of ['tbl','stats','vacation','free-hours','holidays','detail-stats','plan-hodin'])document.getElementById(id).innerHTML='';
+  for(const id of ['tbl','stats','vacation','free-hours','detail-stats','plan-hodin'])document.getElementById(id).innerHTML='';
 }
 function subscribeCloudYear(){
   if(!cloudUser||!cloud)return;
