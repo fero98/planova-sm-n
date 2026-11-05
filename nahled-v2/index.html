@@ -875,6 +875,15 @@ function proposeSchedule(year,month,original,previous,next,selected){
     if(!slots.length){best=[];break;}
     if(bestScore<10000&&attempt>=2)break;
   }
+  if(best&&bestScore<10000&&slots.length>1){
+    let current=best.slice(),score=evaluate(current).soft;
+    for(let i=0;i<22000;i++){
+      const x=Math.floor(Math.random()*slots.length),y=Math.floor(Math.random()*slots.length);if(x===y||current[x]===current[y]||!slots[x].candidates.includes(current[y])||!slots[y].candidates.includes(current[x]))continue;
+      [current[x],current[y]]=[current[y],current[x]];const trial=evaluate(current),temperature=Math.max(.05,15*(1-i/22000));
+      if(!trial.hard&&(trial.soft<score||Math.random()<Math.exp((score-trial.soft)/temperature))){score=trial.soft;if(score<bestScore){bestScore=score;best=current.slice();}}
+      else [current[x],current[y]]=[current[y],current[x]];
+    }
+  }
   const result=evaluate(best||[]);
   if(result.hard)throw Error('Nepodařilo se najít návrh splňující všechna pevná pravidla. Zkuste vybrat více zaměstnanců nebo upravit zadané směny.');
   const resultMonth={...fixed};slots.forEach((s,i)=>resultMonth[best[i]+'__'+s.day]=s.type);
