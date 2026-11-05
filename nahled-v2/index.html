@@ -158,6 +158,13 @@ input[type=number]{-moz-appearance:textfield}
 </style>
 <style>
 [hidden]{display:none!important}
+#free-hours .status-key{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 14px;font-size:12px}
+#free-hours .status-tag{display:inline-block;padding:3px 7px;margin:3px 1px;border-radius:5px;font-weight:600;line-height:1.4}
+#free-hours .status-done{background:#dbf2e4;color:#14552d}
+#free-hours .status-entered{background:#e1edfc;color:#164778}
+#free-hours .status-pending{background:#fff0d5;color:#784600}
+#free-hours .status-issue{background:#fde4e4;color:#8a2020}
+#free-hours td{padding:10px 5px;line-height:1.6}
 #auth-panel button{padding:12px 18px;border:1px solid #13786c;border-radius:8px;cursor:pointer;font:inherit}
 #auth-panel .btn-primary{background:#13786c;color:white}
 #auth-panel .btn-secondary{background:white;color:#13786c}
@@ -523,6 +530,7 @@ function renderFreeHours(){
     const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok), vacationRows=vacationSummary(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
     html+='<p style="padding:0 18px 12px;color:#627781;font-size:12px">Přehled zahrnuje i budoucí plánované směny; splnění podle plánu není potvrzením skutečného nároku. FH = 11,5 h, F8 = 8 h.</p>';
+    html+='<div class="status-key" aria-label="Význam barev"><span class="status-tag status-done">Splněno podle plánu</span><span class="status-tag status-entered">Zadané hodiny</span><span class="status-tag status-pending">Nesplněno / čeká</span><span class="status-tag status-issue">Překročeno / termín uplynul</span></div>';
     html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená<br>1. pololetí</th><th scope="col">Free Hours<br>1. pololetí</th><th scope="col">Dovolená<br>2. pololetí</th><th scope="col">Free Hours<br>2. pololetí</th></tr></thead><tbody>';
     for(let i=0;i<first.length;i++){
       const row=first[i],later=second[i],annual=vacationRows[i];
@@ -533,7 +541,10 @@ function renderFreeHours(){
       const vacation=later.vacation===null?'Roční nárok nezadán':'Zbývá za rok '+hoursText(later.vacation);
       const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka splněna podle plánu':'Podmínka pod 40 h nesplněna';
       const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Podmínka pro 24 h nesplněna';
-      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td><strong>'+hoursText(row.vacation)+'</strong><br>z '+quota+'<br>'+status+'</td><td><strong>'+hoursText(row.used)+' zadaných</strong><br>'+remaining+'</td><td><strong>'+hoursText(annual.used-row.vacation)+'</strong><br>z '+quota+'<br>'+vacation+'</td><td><strong>'+hoursText(later.used)+' zadaných</strong><br>'+status2+'<br>'+remaining2+'</td></tr>';
+      const badge=(text,kind)=>'<span class="status-tag status-'+kind+'">'+text+'</span>';
+      const firstRemainingKind=!row.qualifies?'pending':row.remaining<0||(expired&&row.remaining>0)?'issue':'done';
+      const secondRemainingKind=!later.qualifies?'pending':later.remaining<0?'issue':'done';
+      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td>'+badge(hoursText(row.vacation)+' zadaných','entered')+'<br>z '+quota+'<br>'+badge(status,row.qualifies?'done':'pending')+'</td><td>'+badge(hoursText(row.used)+' zadaných','entered')+'<br>'+badge(remaining,firstRemainingKind)+'</td><td>'+badge(hoursText(annual.used-row.vacation)+' zadaných','entered')+'<br>z '+quota+'<br>'+vacation+'</td><td>'+badge(hoursText(later.used)+' zadaných','entered')+'<br>'+badge(status2,later.qualifies?'done':'pending')+'<br>'+badge(remaining2,secondRemainingKind)+'</td></tr>';
     }
     html+='</tbody></table></div>';
   }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled Free Hours nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců.</p>';}
