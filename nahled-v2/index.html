@@ -523,20 +523,16 @@ function renderFreeHours(){
     const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
     html+='<p style="padding:0 18px 12px;color:#627781;font-size:12px">Přehled zahrnuje i budoucí plánované směny; splnění podle plánu není potvrzením skutečného nároku. FH = 11,5 h, F8 = 8 h.</p>';
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená leden–červen</th><th scope="col">Podmínka 40 h</th><th scope="col">Free Hours leden–červen</th><th scope="col">Ze 14 h do 30. června</th></tr></thead><tbody>';
-    for(const row of first){
-      const status=row.qualifies?'Splněno podle rozpisu':'Chybí '+hoursText(40-row.vacation);
-      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining)):'Nárok zatím nesplněn';
+    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">1. pololetí · 14 h</th><th scope="col">2. pololetí · 24 h</th></tr></thead><tbody>';
+    for(let i=0;i<first.length;i++){
+      const row=first[i],later=second[i];
+      const status=row.qualifies?'Splněno podle rozpisu':'Chybí '+hoursText(40-row.vacation)+' dovolené';
+      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Nárok zatím nesplněn';
       if(row.qualifies&&row.remaining>0)remaining+=expired?' · termín uplynul':' · vyčerpat do 30. 6.';
-      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td>'+hoursText(row.vacation)+'</td><td>'+status+'</td><td>'+hoursText(row.used)+'</td><td>'+remaining+'</td></tr>';
-    }
-    html+='</tbody></table></div><p style="padding:16px 18px 8px;font-weight:700">Druhé pololetí · 24 h</p><p style="padding:0 18px 10px;color:#627781;font-size:12px">Podle celoročního rozpisu dovolené musí zbývat méně než 40 h. Čerpání Free Hours se počítá za červenec až prosinec.</p>';
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Zbývá dovolené</th><th scope="col">Podmínka pod 40 h</th><th scope="col">Free Hours červenec–prosinec</th><th scope="col">Z 24 h</th></tr></thead><tbody>';
-    for(const row of second){
-      const vacation=row.vacation===null?'Nárok dovolené nezadán':hoursText(row.vacation);
-      const status=row.vacation===null?'Nelze určit':row.qualifies?'Splněno podle rozpisu':'Nesplněno';
-      const remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining)):'Nárok zatím nesplněn';
-      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td>'+vacation+'</td><td>'+status+'</td><td>'+hoursText(row.used)+'</td><td>'+remaining+'</td></tr>';
+      const vacation=later.vacation===null?'Nárok dovolené nezadán':'Zbývá dovolené '+hoursText(later.vacation);
+      const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka pod 40 h splněna podle rozpisu':'Podmínka pod 40 h nesplněna';
+      const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Nárok zatím nesplněn';
+      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td style="text-align:left">Dovolená leden–červen: '+hoursText(row.vacation)+'<br>'+status+'<br>Free Hours zadáno: '+hoursText(row.used)+'<br><strong>'+remaining+'</strong></td><td style="text-align:left">'+vacation+'<br>'+status2+'<br>Free Hours červenec–prosinec: '+hoursText(later.used)+'<br><strong>'+remaining2+'</strong></td></tr>';
     }
     html+='</tbody></table></div>';
   }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled Free Hours nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců.</p>';}
