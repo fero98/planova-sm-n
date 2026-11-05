@@ -219,7 +219,7 @@ input[type=number]{-moz-appearance:textfield}
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
-  <details class="proposal-box" id="proposal"><summary>Automatický návrh směn</summary><p>Vyberte zaměstnance pro návrh. Zámečník má cíl 10 pracovních směn měsíčně. Sváteční služby, noční před svátkem a nepřítomnosti se zachovají. V návrhu se zkontroluje volno po noční a zákaz tří denních po sobě.</p><div id="proposal-people" class="proposal-people" aria-label="Zaměstnanci pro návrh"></div><button type="button" id="proposal-generate">Navrhnout směny</button><div id="proposal-result" aria-live="polite"></div></details>
+  <details class="proposal-box" id="proposal"><summary>Automatický návrh směn</summary><p>Vyberte zaměstnance pro návrh. Zámečník má cíl 10 pracovních směn měsíčně, v lednu 2027 z toho dvě v různých víkendech. Sváteční služby, noční před svátkem a nepřítomnosti se zachovají. V návrhu se zkontroluje volno po noční a zákaz tří denních po sobě.</p><div id="proposal-people" class="proposal-people" aria-label="Zaměstnanci pro návrh"></div><button type="button" id="proposal-generate">Navrhnout směny</button><div id="proposal-result" aria-live="polite"></div></details>
   <div class="leave-overviews">
     <div class="leave-left">
       <section id="vacation" class="tbl-card" aria-label="Roční přehled dovolené"></section>
@@ -841,7 +841,7 @@ function proposeSchedule(year,month,original,previous,next,selected){
   const prevdays=new Date(year,month-1,0).getDate();
   const adjacent=(z,d)=>d<1?(month>1?previous[z+'__'+(prevdays+d)]:undefined):d>days?(month<12?next[z+'__'+(d-days)]:undefined):undefined;
   function evaluate(assign){
-    let hard=0,soft=0,grid=Object.fromEntries(ZAM.map(z=>[z,Array(days+1).fill('')])),stats=Object.fromEntries(selected.map(z=>[z,{count:0,hours:0,night:0,weekend:0,day:0}]));
+    let hard=0,soft=0,grid=Object.fromEntries(ZAM.map(z=>[z,Array(days+1).fill('')])),stats=Object.fromEntries(selected.map(z=>[z,{count:0,hours:0,night:0,weekend:0,day:0,weekendGroups:[]}]));
     for(const [key,value] of Object.entries(fixed)){let [z,d]=key.split('__');grid[z][+d]=value;}
     for(let i=0;i<slots.length;i++){const {day,type}=slots[i],z=assign[i];if(grid[z][day])hard+=1;else grid[z][day]=type;}
     for(const z of ZAM){
@@ -853,11 +853,11 @@ function proposeSchedule(year,month,original,previous,next,selected){
         if(value==='D'&&shift(d-1)==='D'&&shift(d-2)==='D')hard++;
         if(d===days&&value==='D'&&after==='D'&&shift(d+2)==='D')hard++;
         if(d===days&&value==='D'&&shift(d-1)==='D'&&after==='D')hard++;
-        if(stats[z]&&work.has(value)){let s=stats[z],w=new Date(year,month-1,d).getDay();s.count++;s.hours+=HODINY[value];if(value==='N')s.night++;if(value==='D')s.day++;if(w===0||w===6)s.weekend++;}
+        if(stats[z]&&work.has(value)){let s=stats[z],w=new Date(year,month-1,d).getDay();s.count++;s.hours+=HODINY[value];if(value==='N')s.night++;if(value==='D')s.day++;if(w===0||w===6){s.weekend++;const saturday=d-(w===0?1:0);if(!s.weekendGroups.includes(saturday))s.weekendGroups.push(saturday);}}
         if(d>=4&&work.has(value)&&work.has(shift(d-1))&&work.has(shift(d-2))&&work.has(shift(d-3)))soft+=12;
       }
     }
-    if(stats[ZAM[1]])hard+=Math.abs(stats[ZAM[1]].count-10);
+    if(stats[ZAM[1]]){hard+=Math.abs(stats[ZAM[1]].count-10);if(year===2027&&month===1)hard+=Math.abs(stats[ZAM[1]].weekend-2)+Math.abs(stats[ZAM[1]].weekendGroups.length-2);}
     const other=selected.filter(z=>z!==ZAM[1]);
     if(other.length){for(const prop of ['hours','day','night','weekend']){let vals=other.map(z=>stats[z][prop]),avg=vals.reduce((a,b)=>a+b,0)/vals.length;for(const v of vals)soft+=(v-avg)**2*({hours:.04,day:2,night:5,weekend:8})[prop];}}
     return {hard,soft,grid,stats};
