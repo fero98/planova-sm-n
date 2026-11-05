@@ -176,7 +176,7 @@ input[type=number]{-moz-appearance:textfield}
 
 <main class="main">
 <div class="workspace-intro"><div><div class="eyebrow">Přehled týmu / plánování</div><h2>Každá směna na svém místě.</h2><p>Měsíční rozpis, obsazenost a plán hodin v jednom přehledu.</p></div><div class="year-badge" id="year-badge">2027</div></div>
-<nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
+<nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#vacation">Dovolená</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
 <p class="preview-note">Pracovní náhled pro rok 2027 se jmény z přehledu 2026. Změny směn a hodin se ukládají pouze v tomto prohlížeči; původní rozpis je oddělený.</p>
 <p id="error-message" role="alert"></p>
   <div class="stats" id="stats"></div>
@@ -185,6 +185,7 @@ input[type=number]{-moz-appearance:textfield}
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
+  <section id="vacation" class="tbl-card" style="margin-top:24px" aria-label="Roční přehled dovolené"></section>
   <details class="rules-note"><summary>Pravidla výpočtu a zkratky</summary><p>Obsazenost a pracovní směny zahrnují D, N, R a S. FH, F8, LP a ŠK čekají na potvrzení provozních pravidel. Hodinové sazby zůstávají stejné jako v původním plánovači; jsou uvedené v legendě.</p></details>
   <div style="display:flex;gap:16px;margin-top:16px;align-items:flex-start;flex-wrap:wrap">
     <div id="detail-stats"></div>
@@ -349,6 +350,7 @@ function closeModal(e){
 
 function render(){
   document.getElementById('year-badge').textContent=rok;
+  renderVacation();
   const dni=pocetDni();
   const tbl=document.getElementById('tbl');
   let html='<thead><tr><th class="col-name">Zaměstnanec</th>';
@@ -399,6 +401,55 @@ function render(){
     <div class="stat"><div class="stat-val" style="color:#555">${MESICE[mes-1]} ${rok}</div><div class="stat-lbl">Vybrané období</div></div>
   `;
 }
+
+// Annual vacation is derived from saved DD/DK entries, never from an incrementing counter.
+function defaultAllowance(z,year){return year===2027?(z===ZAM[6]?200:188):null;}
+function validAllowance(value){return typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=8760&&Number.isInteger(value*2);}
+function vacationSummary(year){
+  const totals=Object.fromEntries(ZAM.map(z=>[z,0]));
+  const allowances=readObject('vacation:'+year);
+  for(const [z,value] of Object.entries(allowances)){
+    if(!ZAM.includes(z)||!validAllowance(value))throw Error('Neplatný roční nárok dovolené.');
+  }
+  for(let month=1;month<=12;month++){
+    const entries=readObject('shifts:'+year+':'+month);
+    for(const [key,shift] of Object.entries(entries)){
+      const parts=key.split('__'),z=parts[0],day=parts[1];
+      if(parts.length!==2||!ZAM.includes(z)||!/^\d+$/.test(day)||+day<1||+day>new Date(year,month,0).getDate()||!validShift(shift))throw Error('Neplatná směna v měsíci '+month+'.');
+      if(shift==='DD'||shift==='DK')totals[z]+=HODINY[shift];
+    }
+  }
+  return ZAM.map(z=>{const allowance=allowances[z]??defaultAllowance(z,year);return {id:z,allowance,used:totals[z],remaining:allowance===null?null:allowance-totals[z]};});
+}
+function hoursText(value){return value.toLocaleString('cs-CZ',{maximumFractionDigits:1})+' h';}
+function renderVacation(){
+  const target=document.getElementById('vacation');
+  let html='<div class="section-heading"><div><h3>Dovolená · '+rok+'</h3><p>Celý rok · DD 11,5 h / DK 8 h · zadaná dovolená zahrnuje i budoucí termíny.</p></div></div>';
+  try{
+    const rows=vacationSummary(rok);
+    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Roční nárok</th><th scope="col">Zadaná dovolená</th><th scope="col">Zbývá</th></tr></thead><tbody>';
+    for(const row of rows){
+      const left=row.remaining===null?'Nárok nezadán':row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining);
+      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td><input type="number" min="0" max="8760" step="0.5" data-vacation="'+row.id+'" aria-label="'+employeeName(row.id)+', nárok dovolené '+rok+' v hodinách" value="'+(row.allowance??'')+'" style="width:85px;padding:8px;border:1px solid #c7dcd6;border-radius:6px"> h</td><td>'+hoursText(row.used)+'</td><td style="font-weight:700;color:'+(row.remaining!==null&&row.remaining<0?'#a02626':'#176652')+'">'+left+'</td></tr>';
+    }
+    html+='</tbody></table></div><p style="padding:12px 18px;font-size:12px;color:#627781">Nárok lze upravit v hodinách včetně převodu. Změny se ukládají pouze v tomto prohlížeči.</p>';
+  }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled dovolené nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců; původní data zůstala zachována.</p>';}
+  target.innerHTML=html;
+}
+document.getElementById('vacation').addEventListener('change',event=>{
+  const input=event.target;
+  if(!input.matches('input[data-vacation]'))return;
+  const z=input.dataset.vacation,value=Number(input.value);
+  if(!ZAM.includes(z)||input.value.trim()===''||!validAllowance(value)){
+    reportError('Nárok dovolené musí být od 0 do 8760 hodin v krocích po 0,5.');renderVacation();return;
+  }
+  try{
+    const values=readObject('vacation:'+rok);values[z]=value;
+    localStorage.setItem(STORE_PREFIX+'vacation:'+rok,JSON.stringify(values));
+    document.getElementById('error-message').textContent='';setStatus('ok');
+  }catch(error){reportError('Nárok dovolené se nepodařilo uložit. Původní hodnota zůstává.');}
+  renderVacation();
+});
 
 // Selecty
 const yearSelect=document.getElementById("sel-rok");
