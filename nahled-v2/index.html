@@ -162,6 +162,15 @@ input[type=number]{-moz-appearance:textfield}
 #auth-panel .btn-primary{background:#13786c;color:white}
 #auth-panel .btn-secondary{background:white;color:#13786c}
 #auth-error{color:#a02626}
+.leave-overviews{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr);gap:16px;align-items:start;margin-top:24px}
+.leave-overviews .tbl-card{min-width:0}
+.leave-overviews table{table-layout:fixed;width:100%}
+.leave-overviews th,.leave-overviews td{white-space:normal;overflow-wrap:anywhere;padding:8px 5px;line-height:1.35}
+.leave-overviews thead th{font-size:11px}
+.leave-overviews tbody th[scope="row"]{padding:9px 7px!important;font-size:12px!important}
+.leave-overviews input[type="number"]{width:60px!important;max-width:75%;padding:6px!important}
+@media(max-width:1000px){.leave-overviews{grid-template-columns:minmax(0,1fr)}}
+@media print{.leave-overviews{display:block}.leave-overviews .tbl-card{margin-bottom:12px}}
 @media print{#auth-panel{display:none}}
 </style>
 </head>
@@ -202,8 +211,10 @@ input[type=number]{-moz-appearance:textfield}
   </div>
   <div class="legenda" id="leg"></div>
   <section id="holidays" class="tbl-card" style="margin-top:24px" aria-label="Přehled svátečních směn"></section>
-  <section id="vacation" class="tbl-card" style="margin-top:24px" aria-label="Roční přehled dovolené"></section>
-  <section id="free-hours" class="tbl-card" style="margin-top:24px" aria-label="Roční přehled Free Hours"></section>
+  <div class="leave-overviews">
+    <section id="vacation" class="tbl-card" aria-label="Roční přehled dovolené"></section>
+    <section id="free-hours" class="tbl-card" aria-label="Roční přehled Free Hours"></section>
+  </div>
   <details class="rules-note"><summary>Pravidla výpočtu a zkratky</summary><p>Obsazenost a pracovní směny zahrnují D, N, R a S. FH a F8 přidávají 11,5 a 8 hodin, ale ne pracovní směnu. LP a ŠK mají 0 hodin. Volno V má 0 hodin a není pracovní směna. DD a DK odečítají 11,5 a 8 hodin dovolené. Roční plán hodin se vyplňuje samostatně.</p></details>
   <div style="display:flex;gap:16px;margin-top:16px;align-items:flex-start;flex-wrap:wrap">
     <div id="detail-stats"></div>
