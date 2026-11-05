@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plánovač směn – testovací náhled v2</title>
+<title>Směny 2027 · pracovní náhled</title>
 <meta name="robots" content="noindex,nofollow">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -101,13 +101,68 @@ input[type=number]{-moz-appearance:textfield}
 .stat-lbl{color:#555}
 @media print{dialog,.preview-note,#error-message{display:none!important}.tbl-wrap{overflow:visible}.smena-cell button{min-width:0;min-height:0}#plan-hodin input{min-height:0}}
 </style>
+<style>
+@media screen {
+  :root{--ink:#172e38;--muted:#627781;--line:#dce5e7;--teal:#13786c;--paper:#fff}
+  body{background:#f3f6f5;color:var(--ink);font-family:'Segoe UI',Arial,sans-serif}
+  .top{background:#fff;color:var(--ink);box-shadow:none;border-bottom:1px solid var(--line);padding:20px 32px;gap:24px}
+  .top h1{font-size:21px;letter-spacing:-.6px;font-weight:750}
+  .top .sub{color:var(--muted);opacity:1;font-size:12px;margin-top:5px}
+  .controls{gap:8px}.controls label{font-size:11px;color:var(--muted)}
+  .controls select,.controls button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 13px;font-weight:600;border-radius:8px;min-height:40px}
+  .controls .btn-primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .controls button:hover{background:#e9f2f0;color:var(--ink)}
+  .sync-status{font-size:11px;color:var(--muted);opacity:1;margin-left:8px}.sync-dot{background:#198674}
+  .main{max-width:1580px;padding:28px 32px 48px}
+  .workspace-intro{display:flex;justify-content:space-between;gap:24px;align-items:center;margin-bottom:24px}
+  .eyebrow{font-size:10px;font-weight:750;letter-spacing:2px;color:var(--teal);text-transform:uppercase;margin-bottom:8px}
+  .workspace-intro h2{font-size:34px;line-height:1.2;letter-spacing:-1.2px;font-weight:700}
+  .workspace-intro p{font-size:13px;color:var(--muted);margin-top:9px;line-height:1.6}
+  .year-badge{border:1px solid #c7dcd6;border-radius:12px;padding:14px 22px;background:#e8f2ed;color:var(--teal);font-size:27px;font-weight:700;letter-spacing:-1px}
+  .section-links{display:flex;gap:24px;margin-bottom:24px;border-bottom:1px solid var(--line);overflow-x:auto}
+  .section-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:0 0 12px;white-space:nowrap}
+  .section-links a:first-child{color:var(--teal);border-bottom:3px solid var(--teal)}
+  .section-links a:hover{color:var(--ink)}
+  .preview-note{background:#eaf1ef;border:0;border-left:3px solid #9abbb0;color:#425e57;border-radius:0 6px 6px 0;padding:10px 14px;font-size:12px;margin-bottom:18px}
+  .rules-note{color:var(--muted);font-size:12px;line-height:1.6;margin:14px 0}.rules-note summary{cursor:pointer;font-weight:600}.rules-note p{padding:8px 0}
+  .stats{grid-template-columns:repeat(4,minmax(0,1fr)) 1.25fr;gap:12px;margin-bottom:24px}
+  .stat{border:1px solid var(--line);border-radius:12px;box-shadow:none;text-align:left;padding:18px 20px}
+  .stat-val{font-size:30px;font-weight:650;letter-spacing:-.7px;color:var(--ink)!important;line-height:1.2}
+  .stat-lbl{color:var(--muted);font-size:11px;margin-top:7px}
+  .stat:last-child{background:#183e40;border-color:#183e40}.stat:last-child .stat-val{color:#fff!important;font-size:22px}.stat:last-child .stat-lbl{color:#c1d8d3}
+  .tbl-card{border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px #17352a05;overflow:hidden;scroll-margin-top:18px}
+  .section-heading{padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+  .section-heading h3{font-size:16px;font-weight:650}.section-heading p{color:var(--muted);font-size:12px;margin-top:5px}.section-heading>span{font-size:11px;color:var(--teal);background:#e8f3ee;border-radius:20px;padding:6px 10px;white-space:nowrap}
+  #tbl thead th{background:#eff4f3;color:#42605d;font-size:12px;padding:13px 3px;border-bottom:1px solid var(--line)}
+  #tbl thead th.col-name{background:#eff4f3;min-width:132px;width:132px;padding-left:20px}
+  #tbl td.col-name{min-width:132px;padding-left:20px;font-size:12px;border-right:1px solid var(--line)}
+  #tbl td{border-color:#e9eeed}.smena-cell{font-size:12px;min-width:33px}
+  .smena-cell button{min-height:46px;min-width:33px}.smena-cell:hover{transform:none;opacity:1;outline:2px solid #13786c;outline-offset:-2px}
+  tbody tr:hover td{background:revert-layer}
+  #tbl .total-row td,#tbl .total-row td.col-name{background:#eaf2ef!important;color:#31554e!important;padding-top:12px;padding-bottom:12px}
+  #tbl .col-sum{background:#f0f5f7!important;color:#38535f}.col-sum2{background:#e9f3ed!important;color:#2d624e}
+  .legenda{border:1px solid var(--line);box-shadow:none;border-radius:12px;padding:16px 20px;gap:12px 18px}.leg-item{font-size:11px;color:#4c626b}.leg-dot{border-radius:5px;width:25px;height:25px}.leg-hint{color:var(--muted)}
+  #detail-stats,#plan-hodin{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;scroll-margin-top:20px}
+  #detail-stats>div:first-child,#plan-hodin>div:first-child{background:#fff!important;color:var(--ink)!important;padding:20px!important;font-size:15px!important;border-bottom:1px solid var(--line);border-radius:0!important}
+  #detail-stats th,#plan-hodin th{background:#edf3f1!important;color:#36564d!important;padding-top:10px!important;padding-bottom:10px!important;font-size:11px!important}
+  #detail-stats th span,#plan-hodin th span{color:#3d5e54!important}
+  #detail-stats td,#plan-hodin td{height:37px;font-size:12px!important}
+  #plan-hodin input{font-size:12px!important;width:49px!important;min-height:32px;border-radius:5px!important}
+  #plan-hodin input:hover{background:#edf4f1!important}#plan-hodin input:focus{background:#fff!important}
+  .modal{padding:26px;max-width:400px}.modal h3{color:var(--ink);font-size:20px}.modal-grid{gap:8px}.modal-btn{min-height:46px;font-size:14px}.modal-close{padding:12px}
+  :focus-visible{outline:3px solid #c27723;outline-offset:2px}
+  @media(max-width:1050px){.controls{margin-left:0}.top{gap:16px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat:last-child{grid-column:span 2}}
+  @media(max-width:600px){.top{padding:18px 16px}.main{padding:22px 16px}.controls{gap:6px}.controls select,.controls button{padding:9px;font-size:12px}.sync-status{width:100%;margin:4px 0 0}.workspace-intro h2{font-size:28px}.year-badge{font-size:22px;padding:12px}.workspace-intro{gap:12px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.stat{padding:16px}.stat-val{font-size:26px}.section-heading{padding:16px}.section-heading>span{display:none}.section-links{gap:22px}}
+}
+@media print{.workspace-intro{margin-bottom:10px}.workspace-intro h2{font-size:20px}.eyebrow,.year-badge,.section-links,.rules-note,.section-heading p,.section-heading>span{display:none}.section-heading{padding:8px}.workspace-intro p{display:none}}
+</style>
 </head>
 <body>
 
 <div class="top">
   <div>
-    <h1>📅 Plánovač směn</h1>
-    <div class="sub">Testovací náhled v2 · fiktivní data</div>
+    <h1>Směny<span style="color:#13786c">.</span></h1>
+    <div class="sub">Plánování týmu · pracovní náhled</div>
   </div>
   <div class="controls">
     <label for="sel-rok">Rok</label><select id="sel-rok"></select>
@@ -120,14 +175,17 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <main class="main">
-<p class="preview-note">TESTOVACÍ VERZE — pouze fiktivní zaměstnanci. Změny se ukládají jen v tomto prohlížeči; nesdílejí se s ostatními. Původní rozpis ani databáze se nepoužívají. Pro testy nevkládejte skutečné osobní údaje.</p>
-<p class="preview-note">Obsazenost a pracovní směny zahrnují D, N, R a S. FH, F8, LP a ŠK čekají na potvrzení provozních pravidel; původní hodinové sazby jsou zachované.</p>
+<div class="workspace-intro"><div><div class="eyebrow">Přehled týmu / plánování</div><h2>Každá směna na svém místě.</h2><p>Měsíční rozpis, obsazenost a plán hodin v jednom přehledu.</p></div><div class="year-badge" id="year-badge">2027</div></div>
+<nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
+<p class="preview-note">Pracovní náhled s fiktivními daty. Změny zůstávají v tomto prohlížeči; původní rozpis je oddělený. Nevkládejte skutečné osobní údaje.</p>
 <p id="error-message" role="alert"></p>
   <div class="stats" id="stats"></div>
-  <div class="tbl-card">
+  <div class="tbl-card" id="schedule">
+    <div class="section-heading"><div><h3>Měsíční rozpis</h3><p>Vyberte den u zaměstnance a přiřaďte směnu.</p></div><span>8 testovacích zaměstnanců</span></div>
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
+  <details class="rules-note"><summary>Pravidla výpočtu a zkratky</summary><p>Obsazenost a pracovní směny zahrnují D, N, R a S. FH, F8, LP a ŠK čekají na potvrzení provozních pravidel. Hodinové sazby zůstávají stejné jako v původním plánovači; jsou uvedené v legendě.</p></details>
   <div style="display:flex;gap:16px;margin-top:16px;align-items:flex-start;flex-wrap:wrap">
     <div id="detail-stats"></div>
     <div id="plan-hodin"></div>
@@ -173,7 +231,7 @@ const WORK = new Set(['D','N','R','S']);
 function isWork(s){return WORK.has(s);}
 function validShift(s){return typeof s==='string'&&SMENY.includes(s);}
 function validHours(h){return typeof h==='number'&&Number.isFinite(h)&&h>=0&&h<=744&&Number.isInteger(h*2);}
-let rok=new Date().getFullYear(), mes=new Date().getMonth()+1;
+let rok=2027, mes=1;
 let data={};
 let modalZi=-1, modalD=-1;
 let dbListener=null;
@@ -287,6 +345,7 @@ function closeModal(e){
 }
 
 function render(){
+  document.getElementById('year-badge').textContent=rok;
   const dni=pocetDni();
   const tbl=document.getElementById('tbl');
   let html='<thead><tr><th class="col-name">Zaměstnanec</th>';
@@ -487,4 +546,3 @@ subscribeMonth();
 </script>
 </body>
 </html>
-
