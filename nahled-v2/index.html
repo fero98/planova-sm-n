@@ -469,7 +469,7 @@ function render(){
 }
 
 // Annual vacation is derived from saved DD/DK entries, never from an incrementing counter.
-function defaultAllowance(z,year){return year===2027?(z===ZAM[6]?200:188):null;}
+function defaultAllowance(z,year){return year===2027?(z===ZAM[1]?94:z===ZAM[6]?200:188):null;}
 function validAllowance(value){return typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=8760&&Number.isInteger(value*2);}
 function vacationSummary(year){
   const totals=Object.fromEntries(ZAM.map(z=>[z,0]));
@@ -502,6 +502,7 @@ function freeHoursSummary(year){
   }
   return ZAM.map(z=>{const allowance=allowances[z]??40;return {id:z,allowance,used:totals[z],remaining:allowance-totals[z]};});
 }
+function freeRules(z,year){return year===2027&&z===ZAM[1]?{vacationFirst:20,grantFirst:8,vacationSecond:20,grantSecond:12}:{vacationFirst:40,grantFirst:16,vacationSecond:40,grantSecond:24};}
 function freeHoursFirstPeriod(year){
   const rows=Object.fromEntries(ZAM.map(z=>[z,{id:z,vacation:0,used:0}]));
   for(let month=1;month<=12;month++){
@@ -512,7 +513,7 @@ function freeHoursFirstPeriod(year){
       if(month<=6&&(shift==='FH'||shift==='F8'))rows[z].used+=HODINY[shift];
     }
   }
-  return ZAM.map(z=>({...rows[z],qualifies:rows[z].vacation>=40,remaining:16-rows[z].used}));
+  return ZAM.map(z=>{const rule=freeRules(z,year);return {...rows[z],threshold:rule.vacationFirst,grant:rule.grantFirst,qualifies:rows[z].vacation>=rule.vacationFirst,remaining:rule.grantFirst-rows[z].used};});
 }
 function freeHoursSecondPeriod(year){
   const vacation=Object.fromEntries(vacationSummary(year).map(row=>[row.id,row.remaining]));
@@ -520,11 +521,11 @@ function freeHoursSecondPeriod(year){
   for(let month=7;month<=12;month++)for(const [key,shift] of Object.entries(readObject('shifts:'+year+':'+month))){
     const [z]=key.split('__');if(shift==='FH'||shift==='F8')used[z]+=HODINY[shift];
   }
-  return ZAM.map(z=>({id:z,vacation:vacation[z],used:used[z],qualifies:vacation[z]!==null&&vacation[z]<40,remaining:24-used[z]}));
+  return ZAM.map(z=>{const rule=freeRules(z,year);return {id:z,vacation:vacation[z],used:used[z],threshold:rule.vacationSecond,grant:rule.grantSecond,qualifies:vacation[z]!==null&&vacation[z]<rule.vacationSecond,remaining:rule.grantSecond-used[z]};});
 }
 function renderFreeHours(){
   const target=document.getElementById('free-hours');
-  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 16 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
+  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 16 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Zámečník má v roce 2027 poloviční podmínky i nároky (20 → 8 h, zůstatek pod 20 → 12 h). Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
   try{
     const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok), vacationRows=vacationSummary(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
@@ -533,13 +534,13 @@ function renderFreeHours(){
     html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená<br>1. pololetí</th><th scope="col">Free Hours<br>1. pololetí</th><th scope="col">Dovolená<br>2. pololetí</th><th scope="col">Free Hours<br>2. pololetí</th></tr></thead><tbody>';
     for(let i=0;i<first.length;i++){
       const row=first[i],later=second[i],annual=vacationRows[i];
-      const status=row.qualifies?'Podmínka splněna podle plánu':'Chybí '+hoursText(40-row.vacation)+' do podmínky';
-      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Podmínka pro 16 h nesplněna';
+      const status=row.qualifies?'Podmínka splněna podle plánu':'Chybí '+hoursText(row.threshold-row.vacation)+' do podmínky';
+      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Podmínka pro '+hoursText(row.grant)+' nesplněna';
       if(row.qualifies&&row.remaining>0)remaining+=expired?' · termín uplynul':' · vyčerpat do 30. 6.';
       const quota=annual.allowance===null?'nárok nezadán':hoursText(annual.allowance)+' za rok';
       const vacation=later.vacation===null?'Roční nárok nezadán':'Zbývá za rok '+hoursText(later.vacation);
-      const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka splněna podle plánu':'Podmínka pod 40 h nesplněna';
-      const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Podmínka pro 24 h nesplněna';
+      const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka splněna podle plánu':'Podmínka pod '+hoursText(later.threshold)+' nesplněna';
+      const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Podmínka pro '+hoursText(later.grant)+' nesplněna';
       const badge=(text,kind)=>'<span class="status-tag status-'+kind+'">'+text+'</span>';
       const firstRemainingKind=!row.qualifies?'pending':row.remaining<0||(expired&&row.remaining>0)?'issue':'done';
       const secondRemainingKind=!later.qualifies?'pending':later.remaining<0?'issue':'done';
