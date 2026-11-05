@@ -485,16 +485,39 @@ function freeHoursSummary(year){
   }
   return ZAM.map(z=>{const allowance=allowances[z]??40;return {id:z,allowance,used:totals[z],remaining:allowance-totals[z]};});
 }
+function freeHoursFirstPeriod(year){
+  const rows=Object.fromEntries(ZAM.map(z=>[z,{id:z,vacation:0,used:0}]));
+  for(let month=1;month<=12;month++){
+    for(const [key,shift] of Object.entries(readObject('shifts:'+year+':'+month))){
+      const parts=key.split('__'),z=parts[0],day=parts[1];
+      if(parts.length!==2||!ZAM.includes(z)||!/^\d+$/.test(day)||+day<1||+day>new Date(year,month,0).getDate()||!validShift(shift))throw Error('Neplatná směna.');
+      if(month<=3&&(shift==='DD'||shift==='DK'))rows[z].vacation+=HODINY[shift];
+      if(month<=6&&(shift==='FH'||shift==='F8'))rows[z].used+=HODINY[shift];
+    }
+  }
+  return ZAM.map(z=>({...rows[z],qualifies:rows[z].vacation>=40,remaining:16-rows[z].used}));
+}
 function renderFreeHours(){
   const target=document.getElementById('free-hours');
-  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Celý rok · FH 11,5 h / F8 8 h · zadané volno zahrnuje i budoucí termíny.</p></div></div>';
+  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidlo podle zadání: 40 h dovolené v lednu až březnu → 16 h Free Hours do 30. června. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
   try{
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Roční nárok</th><th scope="col">Zadané volno</th><th scope="col">Zbývá</th></tr></thead><tbody>';
-    for(const row of freeHoursSummary(rok)){
+    const annual=freeHoursSummary(rok), first=freeHoursFirstPeriod(rok);
+    const expired=new Date()>new Date(rok,5,30,23,59,59,999);
+    html+='<p style="padding:0 18px 12px;color:#627781;font-size:12px">Přehled zahrnuje i budoucí plánované směny; splnění podle plánu není potvrzením skutečného nároku. FH = 11,5 h, F8 = 8 h. Další část Free Hours zatím není stanovena.</p>';
+    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená leden–březen</th><th scope="col">Podmínka 40 h</th><th scope="col">Free Hours leden–červen</th><th scope="col">Z 16 h do 30. června</th></tr></thead><tbody>';
+    for(const row of first){
+      const status=row.qualifies?'Splněno podle rozpisu':'Chybí '+hoursText(40-row.vacation);
+      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining)):'Nárok zatím nesplněn';
+      if(row.qualifies&&row.remaining>0)remaining+=expired?' · termín uplynul':' · vyčerpat do 30. 6.';
+      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td>'+hoursText(row.vacation)+'</td><td>'+status+'</td><td>'+hoursText(row.used)+'</td><td>'+remaining+'</td></tr>';
+    }
+    html+='</tbody></table></div><p style="padding:16px 18px 8px;font-weight:700">Roční evidence Free Hours</p><p style="padding:0 18px 10px;color:#627781;font-size:12px">Roční limit je orientační a nesděluje, kolik hodin už vzniklo jako nárok.</p>';
+    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Roční limit</th><th scope="col">Zadané volno za rok</th><th scope="col">Rozdíl do limitu</th></tr></thead><tbody>';
+    for(const row of annual){
       const left=row.remaining<0?'Překročeno o '+hoursText(-row.remaining):hoursText(row.remaining);
       html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td><input type="number" min="0" max="8760" step="0.5" data-free-hours="'+row.id+'" '+(storageHealthy?'':'disabled')+' aria-label="'+employeeName(row.id)+', nárok Free Hours '+rok+' v hodinách" value="'+row.allowance+'" style="width:85px;padding:8px;border:1px solid #c7dcd6;border-radius:6px"> h</td><td>'+hoursText(row.used)+'</td><td style="font-weight:700;color:'+(row.remaining<0?'#a02626':'#176652')+'">'+left+'</td></tr>';
     }
-    html+='</tbody></table></div><p style="padding:12px 18px;font-size:12px;color:#627781">Výchozí nárok 40 h lze upravit podle skutečného nároku zaměstnance. Změny jsou společné pro oba správce.</p>';
+    html+='</tbody></table></div><p style="padding:12px 18px;font-size:12px;color:#627781">Roční limit lze upravit. Změny jsou společné pro oba správce.</p>';
   }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled Free Hours nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců.</p>';}
   target.innerHTML=html;
 }
