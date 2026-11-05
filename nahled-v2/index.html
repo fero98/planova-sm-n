@@ -177,11 +177,11 @@ input[type=number]{-moz-appearance:textfield}
 <main class="main">
 <div class="workspace-intro"><div><div class="eyebrow">Přehled týmu / plánování</div><h2>Každá směna na svém místě.</h2><p>Měsíční rozpis, obsazenost a plán hodin v jednom přehledu.</p></div><div class="year-badge" id="year-badge">2027</div></div>
 <nav class="section-links" aria-label="Části plánovače"><a href="#schedule">Rozpis směn</a><a href="#detail-stats">Přehled týmu</a><a href="#plan-hodin">Roční plán hodin</a></nav>
-<p class="preview-note">Pracovní náhled s fiktivními daty. Změny zůstávají v tomto prohlížeči; původní rozpis je oddělený. Nevkládejte skutečné osobní údaje.</p>
+<p class="preview-note">Pracovní náhled pro rok 2027 se jmény z přehledu 2026. Změny směn a hodin se ukládají pouze v tomto prohlížeči; původní rozpis je oddělený.</p>
 <p id="error-message" role="alert"></p>
   <div class="stats" id="stats"></div>
   <div class="tbl-card" id="schedule">
-    <div class="section-heading"><div><h3>Měsíční rozpis</h3><p>Vyberte den u zaměstnance a přiřaďte směnu.</p></div><span>8 testovacích zaměstnanců</span></div>
+    <div class="section-heading"><div><h3>Měsíční rozpis</h3><p>Vyberte den u zaměstnance a přiřaďte směnu.</p></div><span>8 zaměstnanců</span></div>
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </div>
   <div class="legenda" id="leg"></div>
@@ -201,7 +201,10 @@ input[type=number]{-moz-appearance:textfield}
 </dialog>
 
 <script type="module">
+// Keep existing storage keys so renaming does not discard saved preview data.
 const ZAM = Array.from({length:8},(_,i)=>`Test ${i+1}`);
+const EMPLOYEE_NAMES = ['Sosnar František','Záměčník Martin','Cenek Dalibor','Komosný Jan','Klusák Jakub','Moj Václav','Levák Jozef','Buchta'];
+function employeeName(id){return EMPLOYEE_NAMES[ZAM.indexOf(id)]||id;}
 const SMENY = ["D","N","R","DD","F8","FH","DK","V","S","LP","ŠK","8",""];
 const HODINY = {D:11.5,N:11.5,DD:11.5,FH:11.5,R:8,S:8,DK:8,F8:8,"8":8,V:0,LP:0,ŠK:0,"":0};
 const NAZVY = {D:"Denní",N:"Noční",R:"Ranní",DD:"Dovolená dl.",FH:"Free FH",DK:"Dovolená kr.",F8:"Free F8",V:"Volno",S:"Sál",LP:"LP",ŠK:"Školení","8":"Svátek","":"Smazat"};
@@ -274,11 +277,11 @@ function subscribeMonth(){
     for(const z of ZAM){
       const values=plans[z]??Array(12).fill(0);
       if(!Array.isArray(values)||values.length!==12||!values.every(validHours))throw Error('Neplatný roční plán; data nebudou přepsána.');
-      PLAN_HODINY[z]={jmeno:z,h:values};
+      PLAN_HODINY[z]={jmeno:employeeName(z),h:values};
     }
     setStatus('ok');
   }catch(error){
-    storageHealthy=false;data={};PLAN_HODINY=Object.fromEntries(ZAM.map(z=>[z,{jmeno:z,h:Array(12).fill(0)}]));
+    storageHealthy=false;data={};PLAN_HODINY=Object.fromEntries(ZAM.map(z=>[z,{jmeno:employeeName(z),h:Array(12).fill(0)}]));
     reportError('Testovací data nelze načíst. '+error.message);
   }
   render();
@@ -321,7 +324,7 @@ modal.addEventListener('close',()=>document.querySelector('.smena-cell[data-zi="
 function openModal(zi,d){
   if(!storageHealthy)return;
   modalZi=zi; modalD=d;
-  document.getElementById('modal-title').textContent=`${ZAM[zi]} – ${d}. ${MESICE[mes-1]}`;
+  document.getElementById('modal-title').textContent=`${employeeName(ZAM[zi])} – ${d}. ${MESICE[mes-1]}`;
   const grid=document.getElementById('modal-grid');
   grid.innerHTML='';
   SMENY.forEach(s=>{
@@ -359,13 +362,13 @@ function render(){
 
   ZAM.forEach((z,zi)=>{
     let odpr=0,hod=0;
-    html+=`<tr><td class="col-name">${z}</td>`;
+    html+=`<tr><td class="col-name">${employeeName(z)}</td>`;
     for(let d=1;d<=dni;d++){
       let s=getS(z,d),we=isWe(d),sv=isSv(d);
       let cellBg=s?BARVY[s].bg:(we?'#c6e0b4':(sv?'#fff8e6':''));
       let cellCol=s?BARVY[s].col:'#ccc';
       if(isWork(s))odpr++;hod+=HODINY[s]||0;
-      html+=`<td class="smena-cell" data-zi="${zi}" data-d="${d}" style="background:${cellBg};color:${cellCol}"><button type="button" aria-label="${z}, ${d}. ${mes}. ${rok}: ${s?NAZVY[s]:'bez směny'}" ${storageHealthy?'':'disabled'}>${s||'·'}</button></td>`;
+      html+=`<td class="smena-cell" data-zi="${zi}" data-d="${d}" style="background:${cellBg};color:${cellCol}"><button type="button" aria-label="${employeeName(z)}, ${d}. ${mes}. ${rok}: ${s?NAZVY[s]:'bez směny'}" ${storageHealthy?'':'disabled'}>${s||'·'}</button></td>`;
     }
     html+=`<td class="col-sum">${odpr}</td><td class="col-sum2">${hod.toFixed(1)}</td></tr>`;
   });
@@ -455,7 +458,7 @@ function renderStats(){
       if(isWork(s))celkem++; hodCelkem += HODINY[s] || 0;
     }
     html += `<tr style="border-bottom:1px solid #eef2f7${zi%2===1?';background:#f7faff':''}" onmouseover="this.style.background='#e8f4ff'" onmouseout="this.style.background='${zi%2===1?'#f7faff':''}'">`;
-    html += `<td style="padding:3px 8px;font-weight:600;color:#1a1a2e;text-align:left">${z}</td>`;
+    html += `<td style="padding:3px 8px;font-weight:600;color:#1a1a2e;text-align:left">${employeeName(z)}</td>`;
     typy.forEach(t => {
       const v = pocty[t];
       html += `<td style="text-align:center;padding:3px 3px;color:${v>0?cols[t]:'#ccc'};font-weight:${v>0?'700':'400'}">${v > 0 ? v : '–'}</td>`;
@@ -485,7 +488,7 @@ function renderPlanHodin(){
   let html = '<div style="padding:8px 14px;background:linear-gradient(135deg,#1F4E79,#2E75B6);color:#fff;font-weight:600;font-size:12px;border-radius:12px 12px 0 0">📊 Plán hodin ' + rok + ' – testovací roční přehled</div>';
   html += '<div style="overflow-x:auto;width:100%"><table style="border-collapse:collapse;font-size:10px;width:100%">';
   html += '<thead><tr style="background:#1F4E79">';
-  html += '<th style="text-align:left;padding:4px 6px;font-weight:600;color:#aac8e8;font-size:9px;white-space:nowrap">Test ID</th>';
+  html += '<th style="text-align:left;padding:4px 6px;font-weight:600;color:#aac8e8;font-size:9px;white-space:nowrap">Poř.</th>';
   html += '<th style="text-align:left;padding:4px 8px;font-weight:600;color:#fff;white-space:nowrap">Jméno</th>';
   mesKratce.forEach((m, mi) => {
     const isAkt = (mi+1) === mes;
@@ -505,7 +508,7 @@ function renderPlanHodin(){
     p.h.forEach((h, mi) => {
       const isAkt = (mi+1) === mes;
       const bg = isAkt ? 'background:#e8f0fe;font-weight:700;' : '';
-      html += `<td style="text-align:center;padding:2px 6px;${bg}"><input type="number" min="0" max="744" step="0.5" value="${h}" data-employee="${z}" data-month="${mi}" aria-label="${z}, ${mesKratce[mi]} ${rok}, plán hodin" ${storageHealthy?'':'disabled'} style="width:40px;text-align:center;border:none;background:transparent;font-size:10px;color:#1a1a2e;padding:0"></td>`;
+      html += `<td style="text-align:center;padding:2px 6px;${bg}"><input type="number" min="0" max="744" step="0.5" value="${h}" data-employee="${z}" data-month="${mi}" aria-label="${employeeName(z)}, ${mesKratce[mi]} ${rok}, plán hodin" ${storageHealthy?'':'disabled'} style="width:40px;text-align:center;border:none;background:transparent;font-size:10px;color:#1a1a2e;padding:0"></td>`;
     });
     html += `<td style="text-align:center;padding:3px 4px;font-weight:700;color:#375623">${celkem % 1 === 0 ? celkem : celkem.toFixed(1)}</td>`;
     html += '</tr>';
@@ -520,7 +523,7 @@ window.exportCSV=function(){
   const dni=pocetDni();
   let csv=`Zaměstnanec,${Array.from({length:dni},(_,i)=>i+1).join(',')},Směn,Hodin\n`;
   ZAM.forEach(z=>{
-    let row=[z]; let odpr=0,hod=0;
+    let row=[employeeName(z)]; let odpr=0,hod=0;
     for(let d=1;d<=dni;d++){let s=getS(z,d);row.push(s);if(isWork(s))odpr++;hod+=HODINY[s]||0;}
     row.push(odpr,hod.toFixed(1));
     csv+=row.join(',')+'\n';
