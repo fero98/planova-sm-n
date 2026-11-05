@@ -513,7 +513,7 @@ function freeHoursFirstPeriod(year){
       if(month<=6&&(shift==='FH'||shift==='F8'))rows[z].used+=HODINY[shift];
     }
   }
-  return ZAM.map(z=>({...rows[z],qualifies:rows[z].vacation>=40,remaining:14-rows[z].used}));
+  return ZAM.map(z=>({...rows[z],qualifies:rows[z].vacation>=40,remaining:16-rows[z].used}));
 }
 function freeHoursSecondPeriod(year){
   const vacation=Object.fromEntries(vacationSummary(year).map(row=>[row.id,row.remaining]));
@@ -525,7 +525,7 @@ function freeHoursSecondPeriod(year){
 }
 function renderFreeHours(){
   const target=document.getElementById('free-hours');
-  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 14 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
+  let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 16 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
   try{
     const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok), vacationRows=vacationSummary(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
@@ -535,7 +535,7 @@ function renderFreeHours(){
     for(let i=0;i<first.length;i++){
       const row=first[i],later=second[i],annual=vacationRows[i];
       const status=row.qualifies?'Podmínka splněna podle plánu':'Chybí '+hoursText(40-row.vacation)+' do podmínky';
-      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Podmínka pro 14 h nesplněna';
+      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Podmínka pro 16 h nesplněna';
       if(row.qualifies&&row.remaining>0)remaining+=expired?' · termín uplynul':' · vyčerpat do 30. 6.';
       const quota=annual.allowance===null?'nárok nezadán':hoursText(annual.allowance)+' za rok';
       const vacation=later.vacation===null?'Roční nárok nezadán':'Zbývá za rok '+hoursText(later.vacation);
