@@ -520,19 +520,20 @@ function renderFreeHours(){
   const target=document.getElementById('free-hours');
   let html='<div class="section-heading"><div><h3>Free Hours · '+rok+'</h3><p>Pravidla podle zadání: 40 h dovolené do 30. června → 14 h Free Hours do 30. června; zůstatek dovolené pod 40 h → 24 h pro druhé pololetí. Pravidla FN Brno zatím nejsou ověřena.</p></div></div>';
   try{
-    const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok);
+    const first=freeHoursFirstPeriod(rok), second=freeHoursSecondPeriod(rok), vacationRows=vacationSummary(rok);
     const expired=new Date()>new Date(rok,5,30,23,59,59,999);
     html+='<p style="padding:0 18px 12px;color:#627781;font-size:12px">Přehled zahrnuje i budoucí plánované směny; splnění podle plánu není potvrzením skutečného nároku. FH = 11,5 h, F8 = 8 h.</p>';
-    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">1. pololetí · 14 h</th><th scope="col">2. pololetí · 24 h</th></tr></thead><tbody>';
+    html+='<div class="tbl-wrap"><table><thead><tr><th scope="col">Zaměstnanec</th><th scope="col">Dovolená<br>1. pololetí</th><th scope="col">Free Hours<br>1. pololetí</th><th scope="col">Dovolená<br>2. pololetí</th><th scope="col">Free Hours<br>2. pololetí</th></tr></thead><tbody>';
     for(let i=0;i<first.length;i++){
-      const row=first[i],later=second[i];
-      const status=row.qualifies?'Splněno podle rozpisu':'Chybí '+hoursText(40-row.vacation)+' dovolené';
-      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Nárok zatím nesplněn';
+      const row=first[i],later=second[i],annual=vacationRows[i];
+      const status=row.qualifies?'Podmínka splněna podle plánu':'Chybí '+hoursText(40-row.vacation)+' do podmínky';
+      let remaining=row.qualifies?(row.remaining<0?'Překročeno o '+hoursText(-row.remaining):'Zbývá '+hoursText(row.remaining)):'Podmínka pro 14 h nesplněna';
       if(row.qualifies&&row.remaining>0)remaining+=expired?' · termín uplynul':' · vyčerpat do 30. 6.';
-      const vacation=later.vacation===null?'Nárok dovolené nezadán':'Zbývá dovolené '+hoursText(later.vacation);
-      const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka pod 40 h splněna podle rozpisu':'Podmínka pod 40 h nesplněna';
-      const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Nárok zatím nesplněn';
-      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td style="text-align:left">Dovolená leden–červen: '+hoursText(row.vacation)+'<br>'+status+'<br>Free Hours zadáno: '+hoursText(row.used)+'<br><strong>'+remaining+'</strong></td><td style="text-align:left">'+vacation+'<br>'+status2+'<br>Free Hours červenec–prosinec: '+hoursText(later.used)+'<br><strong>'+remaining2+'</strong></td></tr>';
+      const quota=annual.allowance===null?'nárok nezadán':hoursText(annual.allowance)+' za rok';
+      const vacation=later.vacation===null?'Roční nárok nezadán':'Zbývá za rok '+hoursText(later.vacation);
+      const status2=later.vacation===null?'Podmínku nelze určit':later.qualifies?'Podmínka splněna podle plánu':'Podmínka pod 40 h nesplněna';
+      const remaining2=later.qualifies?(later.remaining<0?'Překročeno o '+hoursText(-later.remaining):'Zbývá '+hoursText(later.remaining)):'Podmínka pro 24 h nesplněna';
+      html+='<tr><th scope="row" style="padding:14px;text-align:left;font-size:13px">'+employeeName(row.id)+'</th><td><strong>'+hoursText(row.vacation)+'</strong><br>z '+quota+'<br>'+status+'</td><td><strong>'+hoursText(row.used)+' zadaných</strong><br>'+remaining+'</td><td><strong>'+hoursText(annual.used-row.vacation)+'</strong><br>z '+quota+'<br>'+vacation+'</td><td><strong>'+hoursText(later.used)+' zadaných</strong><br>'+status2+'<br>'+remaining2+'</td></tr>';
     }
     html+='</tbody></table></div>';
   }catch(error){html+='<p role="alert" style="padding:18px;color:#a02626">Přehled Free Hours nelze spočítat. Zkontrolujte uložené údaje jednotlivých měsíců.</p>';}
